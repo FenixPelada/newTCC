@@ -1,23 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_test_project/components/board_column.dart';
 
 class ProfessorColumn extends StatelessWidget {
-
-  final Color color;
-  final String  text;
-
-  const ProfessorColumn({super.key, required this.color, required this.text});
+  const ProfessorColumn({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        color: color,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          //crossAxisAlignment: CrossAxisAlignment.center,
-          children: [Text(text, style: TextStyle(fontSize: 30))],
-        ),
-      ),
+    return const BoardColumn(
+      title: "Professores",
+      icon: Icons.person_outline,
+      child: EmptyColumnHint(message: "Nenhum professor cadastrado"),
     );
   }
 }

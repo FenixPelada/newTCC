@@ -1,23 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_test_project/components/board_column.dart';
 
 class SubjectColumn extends StatelessWidget {
-
-  final Color color;
-  final String text;
-
-  const SubjectColumn({super.key, required this.color, required this.text});
+  const SubjectColumn({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        color: color,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          //crossAxisAlignment: CrossAxisAlignment.center,
-          children: [Text(text, style: TextStyle(fontSize: 30))],
-        ),
-      ),
+    return const BoardColumn(
+      title: "Matérias",
+      icon: Icons.menu_book_outlined,
+      child: EmptyColumnHint(message: "Nenhuma matéria cadastrada"),
     );
   }
 }

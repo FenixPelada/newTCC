@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test_project/model/course/course.dart';
 import 'package:flutter_test_project/model/professor/professor.dart';
 
