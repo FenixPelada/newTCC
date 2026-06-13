@@ -10,37 +10,46 @@ class BaseLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: const Padding(
+          padding: EdgeInsets.only(left: 12),
+          child: Icon(Icons.calendar_month_outlined),
+        ),
         title: const Text("PROJETO TIMETABLE"),
-        backgroundColor: Colors.grey,
-        toolbarHeight: 110,
+        toolbarHeight: 72,
         actions: [
-
-          FilledButton(
-            onPressed: () => Navigator.pushNamed(context, "/"),
-            style: FilledButton.styleFrom(backgroundColor: Colors.blue),
-            child: Text("Página 1"),
-          ),
-          
-          SizedBox(width: 10),
-
-          FilledButton(
-            onPressed: () => Navigator.pushNamed(context, "/page2"),
-            style: FilledButton.styleFrom(backgroundColor: Colors.blue),
-            child: Text("Página 2"),
-          ),
-
-          SizedBox(width: 10),
-
-          FilledButton(
-            onPressed: () => Navigator.pushNamed(context, "/page3"),
-            style: FilledButton.styleFrom(backgroundColor: Colors.blue),
-            child: Text("Página 3"),
-          ),
-
-          SizedBox(width: 20),
+          _NavButton(label: "Página 1", route: "/"),
+          _NavButton(label: "Página 2", route: "/page2"),
+          _NavButton(label: "Página 3", route: "/page3"),
+          const SizedBox(width: 12),
         ],
       ),
       body: body,
+    );
+  }
+}
+
+class _NavButton extends StatelessWidget {
+  final String label;
+  final String route;
+
+  const _NavButton({required this.label, required this.route});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: TextButton(
+        onPressed: () => Navigator.pushNamed(context, route),
+        style: TextButton.styleFrom(
+          foregroundColor: Colors.white,
+          backgroundColor: Colors.white.withValues(alpha: 0.12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        child: Text(label),
+      ),
     );
   }
 }

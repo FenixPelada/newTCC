@@ -1,53 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_test_project/components/board_column.dart';
 
 class CourseColumn extends StatefulWidget {
-
-  final Color color;
-  final String text;
-
-  const CourseColumn({super.key, required this.color, required this.text});
-
-  void addItem(){
-    
-  }
+  const CourseColumn({super.key});
 
   @override
   State<CourseColumn> createState() => _CourseColumnState();
 }
 
 class _CourseColumnState extends State<CourseColumn> {
+  void addItem() {}
+
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        alignment: Alignment.topCenter,
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Text(widget.text, style: TextStyle(fontSize: 30)),
-                SizedBox(width: 10),
-                FilledButton(
-                  onPressed: (){
-                    widget.addItem();
-                  },
-                  child: Text("Adicionar")
-                ),
-                SizedBox(width: 10),
-                FilledButton(onPressed: (){}, child: Text("Remover")),
-              ],
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                  ],
-                ),
-              )
-            )
-          ],
+    return BoardColumn(
+      title: "Cursos",
+      icon: Icons.school_outlined,
+      actions: [
+        IconButton(
+          onPressed: addItem,
+          tooltip: "Adicionar curso",
+          icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+          visualDensity: VisualDensity.compact,
         ),
-      )
+      ],
+      child: const EmptyColumnHint(message: "Nenhum curso cadastrado"),
     );
   }
 }

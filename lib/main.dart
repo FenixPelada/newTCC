@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test_project/theme/app_theme.dart';
 import 'package:flutter_test_project/pages/page1/page1.dart';
 import 'package:flutter_test_project/pages/page2/page2.dart';
 import 'package:flutter_test_project/pages/page3/page3.dart';
@@ -16,9 +17,10 @@ Future<void> main() async {
   );
 
   runApp(
-    const ProviderScope(
+    ProviderScope(
       child: MaterialApp(
         title: "Timetable project",
+        theme: buildIfprTheme(),
         initialRoute: "/",
         routes: {"/": _page1, "/page2": _page2, "/page3": _page3},
       ),
