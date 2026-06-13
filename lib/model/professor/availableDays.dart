@@ -1,0 +1,1 @@
+enum Availabledays {monday, tuesday, wednesday, thursday, friday, saturday, sunday}
