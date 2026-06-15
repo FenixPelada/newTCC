@@ -22,7 +22,10 @@ Future<void> main() async {
         title: "Timetable project",
         theme: buildIfprTheme(),
         initialRoute: "/",
-        routes: {"/": _page1, "/page2": _page2, "/page3": _page3},
+        routes: {
+          "/": _page1,
+          "/page2": _page2,
+          "/page3": _page3},
       ),
     ),
   );
