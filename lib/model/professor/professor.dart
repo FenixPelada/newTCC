@@ -1,12 +1,20 @@
-import 'package:flutter_test_project/model/professor/availableDays.dart';
-import 'package:flutter_test_project/model/subject/subject.dart';
-
 class Professor {
+  Professor({required this.id, required this.name});
 
-  Professor ({required this.id, required this.name, required this.availableDays, required this.subjects});
-  
   final String id;
   final String name;
-  final Availabledays availableDays;
-  final List<Subject> subjects;
+
+  factory Professor.fromJson(Map<String, dynamic> json) => Professor(
+        id: json['id'].toString(),
+        name: json['nome'] as String,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'nome': name,
+      };
+
+  Map<String, dynamic> toInsertJson() => {
+        'nome': name,
+      };
 }

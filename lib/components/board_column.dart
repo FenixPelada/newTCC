@@ -5,6 +5,7 @@ class BoardColumn extends StatelessWidget {
   final String title;
   final IconData icon;
   final Widget child;
+  final int flex;
 
   final List<Widget> actions;
 
@@ -14,11 +15,13 @@ class BoardColumn extends StatelessWidget {
     required this.icon,
     required this.child,
     this.actions = const [],
+    this.flex = 1,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
+      flex: flex,
       child: Container(
         margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(

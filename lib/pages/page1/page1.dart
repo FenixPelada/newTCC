@@ -11,7 +11,7 @@ class Page1 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BaseLayout(
-      title: "Página 1",
+      title: 'Página 1',
       body: const Padding(
         padding: EdgeInsets.all(8),
         child: Row(

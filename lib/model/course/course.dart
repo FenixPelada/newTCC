@@ -1,9 +1,20 @@
-import 'package:flutter_test_project/model/subject/subject.dart';
-
 class Course {
-  Course({required this.id, required this.name, required this.subjects});
+  Course({required this.id, required this.name});
 
   final String id;
   final String name;
-  final Map<Subject, int> subjects;
+
+  factory Course.fromJson(Map<String, dynamic> json) => Course(
+        id: json['id'].toString(),
+        name: json['nome'] as String,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'nome': name,
+      };
+
+  Map<String, dynamic> toInsertJson() => {
+        'nome': name,
+      };
 }
