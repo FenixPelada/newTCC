@@ -1,53 +1,88 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test_project/components/board_column.dart';
+import 'package:flutter_test_project/components/empty_timetable.dart';
+import 'package:flutter_test_project/components/item_card.dart';
+import 'package:flutter_test_project/model/course/course.dart';
 import 'package:flutter_test_project/pages/baseLayout.dart';
+import 'package:flutter_test_project/providers/providers.dart';
 
-class Page3 extends StatelessWidget {
+class Page3 extends ConsumerStatefulWidget {
   const Page3({super.key});
 
   @override
+  ConsumerState<Page3> createState() => _Page3State();
+}
+
+class _Page3State extends ConsumerState<Page3> {
+  Course? _selectedCourse;
+
+  @override
   Widget build(BuildContext context) {
+    final coursesAsync = ref.watch(coursesProvider);
+
     return BaseLayout(
-      title: "Página 3",
+      title: 'Página 3',
       body: Padding(
         padding: const EdgeInsets.all(8),
-        child: Center(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                border: TableBorder.all(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                headingRowColor: WidgetStateProperty.all(
-                  Colors.blue.shade100,
-                ),
-                columns: const [
-                  DataColumn(label: Text('Nome', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('Cargo', style: TextStyle(fontWeight: FontWeight.bold))),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_selectedCourse != null)
+              BoardColumn(
+                flex: 7,
+                title: 'Horário — ${_selectedCourse!.name}',
+                icon: Icons.table_chart_outlined,
+                actions: [
+                  IconButton(
+                    onPressed: () => setState(() => _selectedCourse = null),
+                    tooltip: 'Fechar',
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ],
-                rows: const [
-                  DataRow(cells: [
-                    DataCell(Text('Ana')),
-                    DataCell(Text('ana@email.com')),
-                    DataCell(Text('Dev')),
-                  ]),
-                  DataRow(cells: [
-                    DataCell(Text('João')),
-                    DataCell(Text('joao@email.com')),
-                    DataCell(Text('Designer')),
-                  ]),
-                  DataRow(cells: [
-                    DataCell(Text('Maria')),
-                    DataCell(Text('maria@email.com')),
-                    DataCell(Text('Designer')),
-                  ]),
-                ],
+                child: const EmptyTimetable(),
+              )
+            else
+              const Expanded(
+                flex: 7,
+                child: EmptyColumnHint(
+                  message: 'Selecione um curso para abrir a grade horária',
+                ),
+              ),
+            BoardColumn(
+              flex: 3,
+              title: 'Cursos',
+              icon: Icons.school_outlined,
+              child: coursesAsync.when(
+                data: (courses) {
+                  if (courses.isEmpty) {
+                    return const EmptyColumnHint(
+                      message: 'Nenhum curso cadastrado',
+                    );
+                  }
+                  return ListView(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    children: courses.map((course) {
+                      final selected = _selectedCourse?.id == course.id;
+                      return ItemCard(
+                        title: course.name,
+                        selected: selected,
+                        onTap: () {
+                          setState(() {
+                            _selectedCourse = selected ? null : course;
+                          });
+                        },
+                      );
+                    }).toList(),
+                  );
+                },
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (e, stack) => EmptyColumnHint(message: 'Erro: $e'),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
