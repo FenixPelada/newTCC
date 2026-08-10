@@ -6,7 +6,7 @@ class Room {
 
   factory Room.fromJson(Map<String, dynamic> json) => Room(
         id: json['id'].toString(),
-        number: json['numero'] as int,
+        number: (json['numero'] as num).toInt(),
       );
 
   Map<String, dynamic> toJson() => {

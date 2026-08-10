@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test_project/services/repositories/aula_repository.dart';
 import 'package:flutter_test_project/services/repositories/course_repository.dart';
 import 'package:flutter_test_project/services/repositories/professor_repository.dart';
 import 'package:flutter_test_project/services/repositories/room_repository.dart';
@@ -20,4 +21,8 @@ final subjectRepositoryProvider = Provider<SubjectRepository>(
 
 final courseRepositoryProvider = Provider<CourseRepository>(
   (ref) => CourseRepository(),
+);
+
+final aulaRepositoryProvider = Provider<AulaRepository>(
+  (ref) => AulaRepository(),
 );

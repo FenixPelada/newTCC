@@ -7,11 +7,8 @@ class RoomRepository {
 
   final SupabaseClient _client;
 
-  /// nome da tabela no supabase
   static const String _table = 'tb_sala';
 
-  /// stream em tempo real de todas as salas, ordenadas por número
-  /// o supabase reemite a lista sempre que a tabela muda
   Stream<List<Room>> watchAll() {
     return _client
         .from(_table)
@@ -20,7 +17,6 @@ class RoomRepository {
         .map((rows) => rows.map(Room.fromJson).toList());
   }
 
-  /// busca pontual de todas as salas (sem realtime)
   Future<List<Room>> fetchAll() async {
     final data = await _client.from(_table).select().order('numero');
     return (data as List)
@@ -28,21 +24,23 @@ class RoomRepository {
         .toList();
   }
 
-  /// insere uma nova sala (o id é gerado pelo supabase)
-  Future<void> add(int number) async {
-    await _client.from(_table).insert({'numero': number});
+  Future<String> add(int number) async {
+    final row = await _client
+        .from(_table)
+        .insert({'numero': number})
+        .select('id')
+        .single();
+    return row['id'].toString();
   }
 
-  /// atualiza o número de uma sala existente
   Future<void> update(Room room) async {
     await _client
         .from(_table)
         .update({'numero': room.number})
-        .eq('id', room.id);
+        .eq('id', int.parse(room.id));
   }
 
-  /// remove uma sala pelo id
   Future<void> delete(String id) async {
-    await _client.from(_table).delete().eq('id', id);
+    await _client.from(_table).delete().eq('id', int.parse(id));
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test_project/model/aula/aula.dart';
 import 'package:flutter_test_project/model/course/course.dart';
 import 'package:flutter_test_project/model/course/course_subject_load.dart';
 import 'package:flutter_test_project/model/professor/professor.dart';
@@ -32,4 +33,8 @@ final coursesProvider = StreamProvider<List<Course>>((ref) {
 
 final courseLoadsProvider = StreamProvider<List<CourseSubjectLoad>>((ref) {
   return ref.read(courseRepositoryProvider).watchLoads();
+});
+
+final aulasProvider = StreamProvider<List<Aula>>((ref) {
+  return ref.read(aulaRepositoryProvider).watchAll();
 });
