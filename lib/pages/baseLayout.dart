@@ -36,13 +36,19 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentRoute = ModalRoute.of(context)?.settings.name;
+    final selected = currentRoute == route;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: TextButton(
-        onPressed: () => Navigator.pushNamed(context, route),
+        onPressed: selected
+            ? null
+            : () => Navigator.pushReplacementNamed(context, route),
         style: TextButton.styleFrom(
           foregroundColor: Colors.white,
-          backgroundColor: Colors.white.withValues(alpha: 0.12),
+          backgroundColor: Colors.white.withValues(alpha: selected ? 0.28 : 0.12),
+          disabledForegroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),

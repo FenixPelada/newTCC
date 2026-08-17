@@ -68,13 +68,6 @@ class _Page2State extends ConsumerState<Page2> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(12, 12, 12, 0),
-                      child: Text(
-                        'Toque em um horário para marcar (vermelho = não pode dar aula).',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    ),
                     Expanded(
                       child: TimetableGrid(
                         interactive: true,
