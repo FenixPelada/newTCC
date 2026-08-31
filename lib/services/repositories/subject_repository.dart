@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_test_project/model/subject/subject.dart';
 
@@ -10,11 +12,43 @@ class SubjectRepository {
   static const String _table = 'tb_materia';
 
   Stream<List<Subject>> watchAll() {
-    return _client
-        .from(_table)
-        .stream(primaryKey: ['id'])
-        .order('nome')
-        .map((rows) => rows.map(Subject.fromJson).toList());
+    final controller = StreamController<List<Subject>>();
+    var closed = false;
+
+    Future<void> emit() async {
+      try {
+        final data = await fetchAll();
+        if (!closed && !controller.isClosed) {
+          controller.add(data);
+        }
+      } catch (error, stackTrace) {
+        if (!closed && !controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      }
+    }
+
+    final channel = _client
+        .channel('watch:$_table')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: _table,
+          callback: (_) => unawaited(emit()),
+        )
+        .subscribe();
+
+    unawaited(emit());
+
+    controller.onCancel = () async {
+      closed = true;
+      await _client.removeChannel(channel);
+      if (!controller.isClosed) {
+        await controller.close();
+      }
+    };
+
+    return controller.stream;
   }
 
   Future<List<Subject>> fetchAll() async {

@@ -8,7 +8,7 @@ class TimetableSlot {
   /// 0 = Seg … 4 = Sex
   final int dayIndex;
 
-  /// 0 = 1º … 5 = 6º
+  /// 0–5 = manhã (1º–6º), 6–11 = tarde (1º–6º)
   final int periodIndex;
 
   @override
@@ -21,7 +21,7 @@ class TimetableSlot {
   int get hashCode => Object.hash(dayIndex, periodIndex);
 }
 
-/// Shared grade: Seg–Sex × 1º–6º.
+/// Shared grade: Seg–Sex × 6 manhã + Almoço + 6 tarde.
 ///
 /// - Page 2: [interactive] true — tap toggles red (unavailable).
 /// - Page 3: pass [buildCell] to show/edit aulas.
@@ -35,7 +35,24 @@ class TimetableGrid extends StatelessWidget {
   });
 
   static const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
-  static const periods = ['1º', '2º', '3º', '4º', '5º', '6º'];
+
+  /// 12 períodos: índices 0–5 manhã, 6–11 tarde. Persistidos no DB como 1–12.
+  static const periods = [
+    '1º M',
+    '2º M',
+    '3º M',
+    '4º M',
+    '5º M',
+    '6º M',
+    '1º T',
+    '2º T',
+    '3º T',
+    '4º T',
+    '5º T',
+    '6º T',
+  ];
+
+  static const morningPeriodCount = 6;
 
   final bool interactive;
   final Set<TimetableSlot> markedSlots;
@@ -61,7 +78,7 @@ class TimetableGrid extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 columnWidths: {
-                  0: const FixedColumnWidth(56),
+                  0: const FixedColumnWidth(64),
                   for (var i = 1; i <= days.length; i++)
                     i: const FlexColumnWidth(),
                 },
@@ -74,22 +91,50 @@ class TimetableGrid extends StatelessWidget {
                       ...days.map(_headerCell),
                     ],
                   ),
-                  for (var p = 0; p < periods.length; p++)
-                    TableRow(
-                      children: [
-                        _headerCell(periods[p]),
-                        for (var d = 0; d < days.length; d++)
-                          _slotCell(
-                            TimetableSlot(dayIndex: d, periodIndex: p),
-                          ),
-                      ],
-                    ),
+                  for (var p = 0; p < morningPeriodCount; p++)
+                    _periodRow(p),
+                  _lunchRow(),
+                  for (var p = morningPeriodCount; p < periods.length; p++)
+                    _periodRow(p),
                 ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  TableRow _periodRow(int periodIndex) {
+    return TableRow(
+      children: [
+        _headerCell(periods[periodIndex]),
+        for (var d = 0; d < days.length; d++)
+          _slotCell(
+            TimetableSlot(dayIndex: d, periodIndex: periodIndex),
+          ),
+      ],
+    );
+  }
+
+  TableRow _lunchRow() {
+    return TableRow(
+      decoration: BoxDecoration(color: Colors.grey.shade200),
+      children: [
+        for (var i = 0; i <= days.length; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+            child: Text(
+              i == 0 ? 'Almoço' : '',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -113,12 +158,12 @@ class TimetableGrid extends StatelessWidget {
     }
 
     if (!interactive) {
-      return const SizedBox(height: 56);
+      return const SizedBox(height: 48);
     }
 
     final marked = markedSlots.contains(slot);
     return Padding(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(4),
       child: Material(
         color: marked ? Colors.red.shade600 : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(8),
@@ -126,11 +171,11 @@ class TimetableGrid extends StatelessWidget {
           onTap: onToggle == null ? null : () => onToggle!(slot),
           borderRadius: BorderRadius.circular(8),
           child: SizedBox(
-            height: 44,
+            height: 40,
             child: Center(
               child: Icon(
                 marked ? Icons.block : Icons.add,
-                size: 18,
+                size: 16,
                 color: marked ? Colors.white : IfprColors.cinzaClaro,
               ),
             ),

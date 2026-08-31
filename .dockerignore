@@ -1,0 +1,14 @@
+.git
+.gitignore
+.dart_tool
+.pub-cache
+.pub
+build
+coverage
+.idea
+*.iml
+*.log
+android/.gradle
+ios/Pods
+macos/Flutter/ephemeral
+**/.DS_Store

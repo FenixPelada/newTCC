@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_test_project/model/professor/professor.dart';
 import 'package:flutter_test_project/model/professor/professor_subject.dart';
@@ -12,18 +14,79 @@ class ProfessorRepository {
   static const String _linkTable = 'tb_professor_materia';
 
   Stream<List<Professor>> watchAll() {
-    return _client
-        .from(_table)
-        .stream(primaryKey: ['id'])
-        .order('nome')
-        .map((rows) => rows.map(Professor.fromJson).toList());
+    return _watchTable<Professor>(
+      table: _table,
+      channelName: 'watch:$_table',
+      fetch: fetchAll,
+    );
   }
 
   Stream<List<ProfessorSubject>> watchSubjectLinks() {
-    return _client
-        .from(_linkTable)
-        .stream(primaryKey: ['id_professor', 'id_materia'])
-        .map((rows) => rows.map(ProfessorSubject.fromJson).toList());
+    return _watchTable<ProfessorSubject>(
+      table: _linkTable,
+      channelName: 'watch:$_linkTable',
+      fetch: fetchAllLinks,
+    );
+  }
+
+  Stream<List<T>> _watchTable<T>({
+    required String table,
+    required String channelName,
+    required Future<List<T>> Function() fetch,
+  }) {
+    final controller = StreamController<List<T>>();
+    var closed = false;
+
+    Future<void> emit() async {
+      try {
+        final data = await fetch();
+        if (!closed && !controller.isClosed) {
+          controller.add(data);
+        }
+      } catch (error, stackTrace) {
+        if (!closed && !controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      }
+    }
+
+    final channel = _client
+        .channel(channelName)
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: table,
+          callback: (_) => unawaited(emit()),
+        )
+        .subscribe();
+
+    unawaited(emit());
+
+    controller.onCancel = () async {
+      closed = true;
+      await _client.removeChannel(channel);
+      if (!controller.isClosed) {
+        await controller.close();
+      }
+    };
+
+    return controller.stream;
+  }
+
+  Future<List<Professor>> fetchAll() async {
+    final data = await _client.from(_table).select().order('nome');
+    return (data as List)
+        .map((row) => Professor.fromJson(row as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<ProfessorSubject>> fetchAllLinks() async {
+    final data = await _client.from(_linkTable).select();
+    return (data as List)
+        .map(
+          (row) => ProfessorSubject.fromJson(row as Map<String, dynamic>),
+        )
+        .toList();
   }
 
   Future<List<String>> fetchSubjectIds(String professorId) async {

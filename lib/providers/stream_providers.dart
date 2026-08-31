@@ -4,6 +4,7 @@ import 'package:flutter_test_project/model/course/course.dart';
 import 'package:flutter_test_project/model/course/course_subject_load.dart';
 import 'package:flutter_test_project/model/professor/professor.dart';
 import 'package:flutter_test_project/model/professor/professor_subject.dart';
+import 'package:flutter_test_project/model/professor/professor_unavailability.dart';
 import 'package:flutter_test_project/model/room/room.dart';
 import 'package:flutter_test_project/model/subject/subject.dart';
 import 'package:flutter_test_project/providers/repository_providers.dart';
@@ -37,4 +38,9 @@ final courseLoadsProvider = StreamProvider<List<CourseSubjectLoad>>((ref) {
 
 final aulasProvider = StreamProvider<List<Aula>>((ref) {
   return ref.read(aulaRepositoryProvider).watchAll();
+});
+
+final professorUnavailabilityProvider =
+    StreamProvider<List<ProfessorUnavailability>>((ref) {
+  return ref.read(professorUnavailabilityRepositoryProvider).watchAll();
 });

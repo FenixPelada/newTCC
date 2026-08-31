@@ -1,24 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_test_project/model/course/course_period_preference.dart';
 import 'package:flutter_test_project/model/course/course_subject_load.dart';
+import 'package:flutter_test_project/model/room/room.dart';
 import 'package:flutter_test_project/model/subject/subject.dart';
 
 class CourseFormResult {
   const CourseFormResult({
     required this.name,
     required this.loads,
+    this.roomId,
+    this.periodPreference = CoursePeriodPreference.manha,
   });
 
   final String name;
+  final String? roomId;
+  final CoursePeriodPreference periodPreference;
   final List<CourseSubjectLoad> loads;
 }
 
 class _LoadRow {
-  _LoadRow({this.subjectId, int classCount = 1})
-      : countController = TextEditingController(text: '$classCount');
+  _LoadRow({
+    this.subjectId,
+    int classCount = 1,
+    int blockSize = 1,
+  })  : countController = TextEditingController(text: '$classCount'),
+        blockSize = blockSize;
 
   String? subjectId;
   final TextEditingController countController;
+  int blockSize;
 
   void dispose() => countController.dispose();
 }
@@ -27,7 +38,11 @@ Future<CourseFormResult?> showCourseFormDialog(
   BuildContext context, {
   required String title,
   required List<Subject> subjects,
+  required List<Room> rooms,
   String? initialName,
+  String? initialRoomId,
+  CoursePeriodPreference initialPeriodPreference =
+      CoursePeriodPreference.manha,
   List<CourseSubjectLoad> initialLoads = const [],
   String courseId = '0',
 }) {
@@ -36,7 +51,10 @@ Future<CourseFormResult?> showCourseFormDialog(
     builder: (context) => _CourseFormDialog(
       title: title,
       subjects: subjects,
+      rooms: rooms,
       initialName: initialName,
+      initialRoomId: initialRoomId,
+      initialPeriodPreference: initialPeriodPreference,
       initialLoads: initialLoads,
       courseId: courseId,
     ),
@@ -47,14 +65,20 @@ class _CourseFormDialog extends StatefulWidget {
   const _CourseFormDialog({
     required this.title,
     required this.subjects,
+    required this.rooms,
     this.initialName,
+    this.initialRoomId,
+    required this.initialPeriodPreference,
     required this.initialLoads,
     required this.courseId,
   });
 
   final String title;
   final List<Subject> subjects;
+  final List<Room> rooms;
   final String? initialName;
+  final String? initialRoomId;
+  final CoursePeriodPreference initialPeriodPreference;
   final List<CourseSubjectLoad> initialLoads;
   final String courseId;
 
@@ -65,12 +89,16 @@ class _CourseFormDialog extends StatefulWidget {
 class _CourseFormDialogState extends State<_CourseFormDialog> {
   late final TextEditingController _nameController;
   late final List<_LoadRow> _rows;
+  String? _roomId;
+  late CoursePeriodPreference _periodPreference;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName ?? '');
+    _roomId = widget.initialRoomId;
+    _periodPreference = widget.initialPeriodPreference;
     if (widget.initialLoads.isEmpty) {
       _rows = [_LoadRow()];
     } else {
@@ -79,6 +107,7 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
             (load) => _LoadRow(
               subjectId: load.subjectId,
               classCount: load.classCount,
+              blockSize: load.blockSize,
             ),
           )
           .toList();
@@ -133,12 +162,20 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
           courseId: widget.courseId,
           subjectId: subjectId,
           classCount: count,
+          blockSize: row.blockSize,
         ),
       );
     }
 
     setState(() => _error = null);
-    Navigator.of(context).pop(CourseFormResult(name: name, loads: loads));
+    Navigator.of(context).pop(
+      CourseFormResult(
+        name: name,
+        roomId: _roomId,
+        periodPreference: _periodPreference,
+        loads: loads,
+      ),
+    );
   }
 
   @override
@@ -146,7 +183,7 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
     return AlertDialog(
       title: Text(widget.title),
       content: SizedBox(
-        width: 520,
+        width: 560,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -159,12 +196,54 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
                 errorText: _error,
               ),
             ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<CoursePeriodPreference>(
+              key: ValueKey('period-$_periodPreference'),
+              initialValue: _periodPreference,
+              decoration: const InputDecoration(
+                labelText: 'Período das aulas',
+              ),
+              items: CoursePeriodPreference.values
+                  .map(
+                    (value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(value.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _periodPreference = value);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String?>(
+              key: ValueKey('room-$_roomId'),
+              initialValue: _roomId,
+              decoration: const InputDecoration(
+                labelText: 'Sala padrão (opcional)',
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Nenhuma'),
+                ),
+                ...widget.rooms.map(
+                  (room) => DropdownMenuItem<String?>(
+                    value: room.id,
+                    child: Text('Sala ${room.number}'),
+                  ),
+                ),
+              ],
+              onChanged: (value) => setState(() => _roomId = value),
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
                 const Expanded(
                   child: Text(
-                    'Matérias e quantidade de aulas',
+                    'Matérias, carga e blocos',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -175,12 +254,17 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
                 ),
               ],
             ),
+            const SizedBox(height: 4),
+            const Text(
+              'Bloco: aulas consecutivas no mesmo dia (1 ou 2).',
+              style: TextStyle(fontSize: 12),
+            ),
             const SizedBox(height: 8),
             if (widget.subjects.isEmpty)
               const Text('Cadastre matérias antes de definir a carga horária.')
             else
               ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 320),
+                constraints: const BoxConstraints(maxHeight: 280),
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
@@ -225,6 +309,28 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
                                     labelText: 'Aulas',
                                     isDense: true,
                                   ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonFormField<int>(
+                                  key: ValueKey(
+                                    'block-$i-${_rows[i].blockSize}',
+                                  ),
+                                  initialValue: _rows[i].blockSize,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Bloco',
+                                    isDense: true,
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: 1, child: Text('1')),
+                                    DropdownMenuItem(value: 2, child: Text('2')),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value != null) {
+                                      setState(() => _rows[i].blockSize = value);
+                                    }
+                                  },
                                 ),
                               ),
                               IconButton(

@@ -4,6 +4,7 @@ import 'package:flutter_test_project/components/board_column.dart';
 import 'package:flutter_test_project/components/item_card.dart';
 import 'package:flutter_test_project/components/timetable_grid.dart';
 import 'package:flutter_test_project/model/professor/professor.dart';
+import 'package:flutter_test_project/model/professor/professor_unavailability.dart';
 import 'package:flutter_test_project/pages/baseLayout.dart';
 import 'package:flutter_test_project/providers/providers.dart';
 
@@ -16,34 +17,59 @@ class Page2 extends ConsumerStatefulWidget {
 
 class _Page2State extends ConsumerState<Page2> {
   Professor? _selectedProfessor;
+  bool _saving = false;
 
-  /// Local marks until `tb_professor_indisponibilidade` is wired.
-  /// Key = professor id.
-  final Map<String, Set<TimetableSlot>> _unavailableByProfessor = {};
-
-  Set<TimetableSlot> _slotsFor(Professor professor) {
-    return _unavailableByProfessor.putIfAbsent(
-      professor.id,
-      () => <TimetableSlot>{},
+  void _showError(Object e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Erro: $e')),
     );
   }
 
-  void _toggleSlot(TimetableSlot slot) {
-    final professor = _selectedProfessor;
-    if (professor == null) return;
+  Set<TimetableSlot> _slotsForProfessor(
+    String professorId,
+    List<ProfessorUnavailability> rows,
+  ) {
+    return rows
+        .where((r) => r.professorId == professorId)
+        .map((r) => r.slot)
+        .toSet();
+  }
 
-    setState(() {
-      final slots = _slotsFor(professor);
-      if (!slots.add(slot)) {
-        slots.remove(slot);
+  Future<void> _toggleSlot(
+    TimetableSlot slot,
+    Set<TimetableSlot> current,
+  ) async {
+    final professor = _selectedProfessor;
+    if (professor == null || _saving) return;
+
+    setState(() => _saving = true);
+    final repo = ref.read(professorUnavailabilityRepositoryProvider);
+
+    try {
+      if (current.contains(slot)) {
+        await repo.deleteByProfessorSlot(
+          professorId: professor.id,
+          slot: slot,
+        );
+      } else {
+        await repo.add(professorId: professor.id, slot: slot);
       }
-    });
+      ref.invalidate(professorUnavailabilityProvider);
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final professorsAsync = ref.watch(professorsProvider);
+    final unavailabilityAsync = ref.watch(professorUnavailabilityProvider);
     final selected = _selectedProfessor;
+    final rows =
+        unavailabilityAsync.value ?? const <ProfessorUnavailability>[];
 
     return BaseLayout(
       title: 'Página 2',
@@ -65,17 +91,41 @@ class _Page2State extends ConsumerState<Page2> {
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: TimetableGrid(
-                        interactive: true,
-                        markedSlots: _slotsFor(selected),
-                        onToggle: _toggleSlot,
-                      ),
-                    ),
-                  ],
+                child: unavailabilityAsync.when(
+                  data: (data) {
+                    final marked = _slotsForProfessor(selected.id, data);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(12, 12, 12, 0),
+                          child: Text(
+                            'Selecione os dias indisponíveis para cada professor'
+                            'Salvo no banco automaticamente.',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        if (_saving)
+                          const LinearProgressIndicator(minHeight: 2),
+                        Expanded(
+                          child: TimetableGrid(
+                            interactive: true,
+                            markedSlots: marked,
+                            onToggle: _saving
+                                ? null
+                                : (slot) => _toggleSlot(slot, marked),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => EmptyColumnHint(
+                    message:
+                        'Erro ao carregar indisponibilidade '
+                        '(crie tb_professor_indisponibilidade no Supabase):\n$e',
+                  ),
                 ),
               )
             else
@@ -101,9 +151,14 @@ class _Page2State extends ConsumerState<Page2> {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     children: professors.map((professor) {
                       final isSelected = selected?.id == professor.id;
-                      final blocked = _unavailableByProfessor[professor.id]?.length ?? 0;
+                      final blocked = rows
+                          .where((r) => r.professorId == professor.id)
+                          .length;
                       return ItemCard(
                         title: professor.name,
+                        subtitle: blocked == 0
+                            ? null
+                            : '$blocked horário(s) bloqueado(s)',
                         selected: isSelected,
                         onTap: () {
                           setState(() {

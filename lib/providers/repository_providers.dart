@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test_project/services/repositories/aula_repository.dart';
 import 'package:flutter_test_project/services/repositories/course_repository.dart';
 import 'package:flutter_test_project/services/repositories/professor_repository.dart';
+import 'package:flutter_test_project/services/repositories/professor_unavailability_repository.dart';
 import 'package:flutter_test_project/services/repositories/room_repository.dart';
 import 'package:flutter_test_project/services/repositories/subject_repository.dart';
 
@@ -25,4 +26,9 @@ final courseRepositoryProvider = Provider<CourseRepository>(
 
 final aulaRepositoryProvider = Provider<AulaRepository>(
   (ref) => AulaRepository(),
+);
+
+final professorUnavailabilityRepositoryProvider =
+    Provider<ProfessorUnavailabilityRepository>(
+  (ref) => ProfessorUnavailabilityRepository(),
 );

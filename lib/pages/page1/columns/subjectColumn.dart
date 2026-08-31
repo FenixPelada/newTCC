@@ -19,6 +19,7 @@ class SubjectColumn extends ConsumerWidget {
 
     try {
       await ref.read(subjectRepositoryProvider).add(name);
+      ref.invalidate(subjectsProvider);
     } catch (e) {
       if (!context.mounted) return;
       _showError(context, e);
@@ -41,6 +42,7 @@ class SubjectColumn extends ConsumerWidget {
       await ref.read(subjectRepositoryProvider).update(
             Subject(id: subject.id, name: name),
           );
+      ref.invalidate(subjectsProvider);
     } catch (e) {
       if (!context.mounted) return;
       _showError(context, e);
@@ -62,6 +64,7 @@ class SubjectColumn extends ConsumerWidget {
 
     try {
       await ref.read(subjectRepositoryProvider).delete(subject.id);
+      ref.invalidate(subjectsProvider);
     } catch (e) {
       if (!context.mounted) return;
       _showError(context, e);

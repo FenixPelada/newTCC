@@ -93,12 +93,23 @@ class AulaRepository {
         .update({
           'id_materia': int.parse(aula.subjectId),
           'id_professor': int.parse(aula.professorId),
-          if (aula.roomId != null) 'id_sala': int.parse(aula.roomId!),
+          'id_sala': aula.roomId == null ? null : int.parse(aula.roomId!),
         })
         .eq('id', int.parse(aula.id));
   }
 
   Future<void> delete(String id) async {
     await _client.from(_table).delete().eq('id', int.parse(id));
+  }
+
+  Future<void> deleteByCourse(String courseId) async {
+    await _client
+        .from(_table)
+        .delete()
+        .eq('id_curso', int.parse(courseId));
+  }
+
+  Future<void> deleteAll() async {
+    await _client.from(_table).delete().neq('id', 0);
   }
 }

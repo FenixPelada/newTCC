@@ -4,6 +4,7 @@ Future<bool> showConfirmDeleteDialog(
   BuildContext context, {
   required String title,
   required String message,
+  String confirmLabel = 'Excluir',
 }) async {
   final result = await showDialog<bool>(
     context: context,
@@ -17,7 +18,7 @@ Future<bool> showConfirmDeleteDialog(
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Excluir'),
+          child: Text(confirmLabel),
         ),
       ],
     ),

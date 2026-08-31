@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test_project/components/board_column.dart';
 import 'package:flutter_test_project/components/dialogs/aula_form_dialog.dart';
+import 'package:flutter_test_project/components/dialogs/confirm_delete_dialog.dart';
 import 'package:flutter_test_project/components/item_card.dart';
 import 'package:flutter_test_project/components/timetable_grid.dart';
 import 'package:flutter_test_project/model/aula/aula.dart';
@@ -9,9 +10,13 @@ import 'package:flutter_test_project/model/course/course.dart';
 import 'package:flutter_test_project/model/course/course_subject_load.dart';
 import 'package:flutter_test_project/model/professor/professor.dart';
 import 'package:flutter_test_project/model/professor/professor_subject.dart';
+import 'package:flutter_test_project/model/professor/professor_unavailability.dart';
+import 'package:flutter_test_project/model/room/room.dart';
 import 'package:flutter_test_project/model/subject/subject.dart';
 import 'package:flutter_test_project/pages/baseLayout.dart';
 import 'package:flutter_test_project/providers/providers.dart';
+import 'package:flutter_test_project/services/timetable_generator.dart';
+import 'package:flutter_test_project/services/timetable_validator.dart';
 import 'package:flutter_test_project/theme/app_theme.dart';
 
 class Page3 extends ConsumerStatefulWidget {
@@ -23,13 +28,16 @@ class Page3 extends ConsumerStatefulWidget {
 
 class _Page3State extends ConsumerState<Page3> {
   Course? _selectedCourse;
+  bool _busy = false;
 
-  void _showError(Object e) {
+  void _showMessage(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Erro: $e')),
+      SnackBar(content: Text(message)),
     );
   }
+
+  void _showError(Object e) => _showMessage('Erro: $e');
 
   Map<String, Subject> _subjectById(List<Subject> subjects) => {
         for (final s in subjects) s.id: s,
@@ -37,6 +45,10 @@ class _Page3State extends ConsumerState<Page3> {
 
   Map<String, Professor> _professorById(List<Professor> professors) => {
         for (final p in professors) p.id: p,
+      };
+
+  Map<String, Room> _roomById(List<Room> rooms) => {
+        for (final r in rooms) r.id: r,
       };
 
   List<Subject> _subjectsForCourse(
@@ -51,16 +63,45 @@ class _Page3State extends ConsumerState<Page3> {
     return subjects.where((s) => ids.contains(s.id)).toList();
   }
 
-  List<Professor> _professorsForSubject(
-    String subjectId,
-    List<Professor> professors,
-    List<ProfessorSubject> links,
+  bool _isUnavailable(
+    List<ProfessorUnavailability> rows,
+    String professorId,
+    TimetableSlot slot,
   ) {
-    final ids = links
+    return rows.any(
+      (u) =>
+          u.professorId == professorId &&
+          u.dayIndex == slot.dayIndex &&
+          u.periodIndex == slot.periodIndex,
+    );
+  }
+
+  List<Professor> _professorsForSubjectAtSlot({
+    required String subjectId,
+    required TimetableSlot slot,
+    required List<Professor> professors,
+    required List<ProfessorSubject> links,
+    required List<ProfessorUnavailability> unavailability,
+    required List<Aula> allAulas,
+    String? excludingAulaId,
+  }) {
+    final linkedIds = links
         .where((l) => l.subjectId == subjectId)
         .map((l) => l.professorId)
         .toSet();
-    return professors.where((p) => ids.contains(p.id)).toList();
+
+    return professors.where((p) {
+      if (!linkedIds.contains(p.id)) return false;
+      if (_isUnavailable(unavailability, p.id, slot)) return false;
+      final busy = allAulas.any(
+        (a) =>
+            a.id != excludingAulaId &&
+            a.professorId == p.id &&
+            a.dayIndex == slot.dayIndex &&
+            a.periodIndex == slot.periodIndex,
+      );
+      return !busy;
+    }).toList();
   }
 
   int _scheduledCount(
@@ -92,6 +133,131 @@ class _Page3State extends ConsumerState<Page3> {
     return null;
   }
 
+  Future<void> _clearCourse(Course course) async {
+    final confirmed = await showConfirmDeleteDialog(
+      context,
+      title: 'Limpar grade',
+      message:
+          'Remover todas as aulas de "${course.name}"? Esta ação não desfaz.',
+    );
+    if (!confirmed) return;
+
+    setState(() => _busy = true);
+    try {
+      await ref.read(aulaRepositoryProvider).deleteByCourse(course.id);
+      ref.invalidate(aulasProvider);
+      _showMessage('Grade de "${course.name}" limpa.');
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _generateAll({
+    required List<Course> courses,
+    required List<CourseSubjectLoad> loads,
+    required List<Professor> professors,
+    required List<ProfessorSubject> links,
+    required List<ProfessorUnavailability> unavailability,
+    required List<Subject> subjects,
+  }) async {
+    final confirmed = await showConfirmDeleteDialog(
+      context,
+      title: 'Gerar horários',
+      message:
+          'Regenerar os horários de todas as turmas? '
+          'Isso apaga os horários atuais e recria com base nas '
+          'configurações da Página 1.',
+      confirmLabel: 'Gerar',
+    );
+    if (!confirmed) return;
+
+    setState(() => _busy = true);
+    try {
+      final repo = ref.read(aulaRepositoryProvider);
+      await repo.deleteAll();
+
+      final result = const TimetableGenerator().generateAll(
+        courses: courses,
+        loads: loads,
+        professors: professors,
+        links: links,
+        unavailability: unavailability,
+        subjectNames: {for (final s in subjects) s.id: s.name},
+        courseNames: {for (final c in courses) c.id: c.name},
+      );
+
+      for (final aula in result.newAulas) {
+        await repo.add(aula);
+      }
+      ref.invalidate(aulasProvider);
+
+      if (result.complete) {
+        _showMessage(
+          'Horários gerados: ${result.newAulas.length} aula(s) alocadas.',
+        );
+      } else if (result.newAulas.isEmpty && result.failures.isNotEmpty) {
+        _showMessage(
+          'Não foi possível gerar: ${result.failures.first}',
+        );
+      } else {
+        _showMessage(
+          'Parcial: ${result.newAulas.length} aula(s). '
+          '${result.failures.take(3).join(' ')}',
+        );
+      }
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _validationPanel({
+    required TimetableValidation validation,
+  }) {
+    final ok = validation.ok;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: ok ? Colors.green.shade50 : Colors.red.shade50,
+        border: Border(
+          top: BorderSide(
+            color: ok ? Colors.green.shade200 : Colors.red.shade200,
+          ),
+        ),
+      ),
+      child: ok
+          ? Text(
+              'Sem problemas',
+              style: TextStyle(
+                color: Colors.green.shade800,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: validation.issues
+                  .map(
+                    (issue) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        issue,
+                        style: TextStyle(
+                          color: Colors.red.shade800,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+    );
+  }
+
   Future<void> _onSlotTap({
     required TimetableSlot slot,
     required Course course,
@@ -101,7 +267,11 @@ class _Page3State extends ConsumerState<Page3> {
     required List<ProfessorSubject> links,
     required List<Aula> allAulas,
     required List<CourseSubjectLoad> loads,
+    required List<ProfessorUnavailability> unavailability,
+    required List<Room> rooms,
   }) async {
+    if (_busy) return;
+
     final dayLabel = TimetableGrid.days[slot.dayIndex];
     final periodLabel = TimetableGrid.periods[slot.periodIndex];
     final title = existing == null
@@ -112,10 +282,19 @@ class _Page3State extends ConsumerState<Page3> {
       context,
       title: title,
       subjects: courseSubjects,
-      professorsForSubject: (subjectId) =>
-          _professorsForSubject(subjectId, professors, links),
+      rooms: rooms,
+      professorsForSubject: (subjectId) => _professorsForSubjectAtSlot(
+        subjectId: subjectId,
+        slot: slot,
+        professors: professors,
+        links: links,
+        unavailability: unavailability,
+        allAulas: allAulas,
+        excludingAulaId: existing?.id,
+      ),
       initialSubjectId: existing?.subjectId,
       initialProfessorId: existing?.professorId,
+      initialRoomId: existing?.roomId ?? course.roomId,
     );
 
     if (result == null) return;
@@ -146,9 +325,12 @@ class _Page3State extends ConsumerState<Page3> {
       excludingAulaId: existing?.id,
     );
     if (already >= max) {
-      _showError(
-        'Carga completa para esta matéria ($max aula(s)).',
-      );
+      _showError('Carga completa para esta matéria ($max aula(s)).');
+      return;
+    }
+
+    if (_isUnavailable(unavailability, result.professorId, slot)) {
+      _showError('Professor indisponível neste horário (Página 2).');
       return;
     }
 
@@ -164,6 +346,20 @@ class _Page3State extends ConsumerState<Page3> {
       return;
     }
 
+    if (result.roomId != null) {
+      final roomBusy = allAulas.any(
+        (a) =>
+            a.id != existing?.id &&
+            a.roomId == result.roomId &&
+            a.dayIndex == slot.dayIndex &&
+            a.periodIndex == slot.periodIndex,
+      );
+      if (roomBusy) {
+        _showError('Esta sala já está ocupada neste horário.');
+        return;
+      }
+    }
+
     try {
       if (existing == null) {
         await ref.read(aulaRepositoryProvider).add(
@@ -174,6 +370,7 @@ class _Page3State extends ConsumerState<Page3> {
                 periodIndex: slot.periodIndex,
                 subjectId: result.subjectId,
                 professorId: result.professorId,
+                roomId: result.roomId,
               ),
             );
       } else {
@@ -185,6 +382,7 @@ class _Page3State extends ConsumerState<Page3> {
                 periodIndex: slot.periodIndex,
                 subjectId: result.subjectId,
                 professorId: result.professorId,
+                roomId: result.roomId,
               ),
             );
       }
@@ -200,16 +398,20 @@ class _Page3State extends ConsumerState<Page3> {
     required Map<TimetableSlot, Aula> bySlot,
     required Map<String, Subject> subjects,
     required Map<String, Professor> professors,
+    required Map<String, Room> roomsById,
     required List<Subject> courseSubjects,
     required List<Professor> allProfessors,
     required List<ProfessorSubject> links,
     required List<Aula> allAulas,
     required List<CourseSubjectLoad> loads,
+    required List<ProfessorUnavailability> unavailability,
+    required List<Room> rooms,
   }) {
     final aula = bySlot[slot];
     final subjectName = aula == null ? null : subjects[aula.subjectId]?.name;
     final professorName =
         aula == null ? null : professors[aula.professorId]?.name;
+    final room = aula?.roomId == null ? null : roomsById[aula!.roomId!];
 
     return Padding(
       padding: const EdgeInsets.all(4),
@@ -217,25 +419,29 @@ class _Page3State extends ConsumerState<Page3> {
         color: aula == null ? Colors.grey.shade100 : IfprColors.verdeFundo,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
-          onTap: () => _onSlotTap(
-            slot: slot,
-            course: course,
-            existing: aula,
-            courseSubjects: courseSubjects,
-            professors: allProfessors,
-            links: links,
-            allAulas: allAulas,
-            loads: loads,
-          ),
+          onTap: _busy
+              ? null
+              : () => _onSlotTap(
+                    slot: slot,
+                    course: course,
+                    existing: aula,
+                    courseSubjects: courseSubjects,
+                    professors: allProfessors,
+                    links: links,
+                    allAulas: allAulas,
+                    loads: loads,
+                    unavailability: unavailability,
+                    rooms: rooms,
+                  ),
           borderRadius: BorderRadius.circular(8),
           child: SizedBox(
-            height: 64,
+            height: 68,
             child: aula == null
                 ? const Center(
                     child: Icon(Icons.add, color: IfprColors.cinzaClaro),
                   )
                 : Padding(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(4),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -246,21 +452,32 @@ class _Page3State extends ConsumerState<Page3> {
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
-                            fontSize: 12,
+                            fontSize: 11,
                             color: IfprColors.verdeEscuro,
                           ),
                         ),
-                        const SizedBox(height: 2),
                         Text(
                           professorName ?? 'Professor',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 10,
                             color: IfprColors.cinzaClaro,
                           ),
                         ),
+                        if (room != null)
+                          Text(
+                            'Sala ${room.number}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: IfprColors.verde,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -291,6 +508,8 @@ class _Page3State extends ConsumerState<Page3> {
     final subjectsAsync = ref.watch(subjectsProvider);
     final professorsAsync = ref.watch(professorsProvider);
     final linksAsync = ref.watch(professorSubjectsProvider);
+    final unavailabilityAsync = ref.watch(professorUnavailabilityProvider);
+    final roomsAsync = ref.watch(roomsProvider);
 
     final selected = _selectedCourse;
     final aulas = aulasAsync.value ?? const <Aula>[];
@@ -298,6 +517,10 @@ class _Page3State extends ConsumerState<Page3> {
     final subjects = subjectsAsync.value ?? const <Subject>[];
     final professors = professorsAsync.value ?? const <Professor>[];
     final links = linksAsync.value ?? const <ProfessorSubject>[];
+    final unavailability =
+        unavailabilityAsync.value ?? const <ProfessorUnavailability>[];
+    final rooms = roomsAsync.value ?? const <Room>[];
+    final courses = coursesAsync.value ?? const <Course>[];
 
     return BaseLayout(
       title: 'Página 3',
@@ -312,6 +535,31 @@ class _Page3State extends ConsumerState<Page3> {
                 title: 'Horário — ${selected.name}',
                 icon: Icons.table_chart_outlined,
                 actions: [
+                  TextButton(
+                    onPressed: _busy || courses.isEmpty
+                        ? null
+                        : () => _generateAll(
+                              courses: courses,
+                              loads: loads,
+                              professors: professors,
+                              links: links,
+                              unavailability: unavailability,
+                              subjects: subjects,
+                            ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Gerar'),
+                  ),
+                  IconButton(
+                    onPressed: _busy ? null : () => _clearCourse(selected),
+                    tooltip: 'Limpar grade',
+                    icon: const Icon(Icons.delete_outline, color: Colors.white),
+                    visualDensity: VisualDensity.compact,
+                  ),
                   IconButton(
                     onPressed: () => setState(() => _selectedCourse = null),
                     tooltip: 'Fechar',
@@ -324,11 +572,24 @@ class _Page3State extends ConsumerState<Page3> {
                     final courseSubjects =
                         _subjectsForCourse(selected.id, loads, subjects);
                     final bySlot = {
-                      for (final a in aulas.where((a) => a.courseId == selected.id))
+                      for (final a
+                          in aulas.where((a) => a.courseId == selected.id))
                         a.slot: a,
                     };
                     final subjectMap = _subjectById(subjects);
                     final professorMap = _professorById(professors);
+                    final roomsMap = _roomById(rooms);
+
+                    final validation = const TimetableValidator().validateCourse(
+                      courseId: selected.id,
+                      allAulas: aulas,
+                      courses: courses,
+                      loads: loads,
+                      professors: professors,
+                      subjects: subjects,
+                      rooms: rooms,
+                      unavailability: unavailability,
+                    );
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -336,10 +597,12 @@ class _Page3State extends ConsumerState<Page3> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                           child: Text(
-                            '${_progressSubtitle(selected, loads, aulas)} · toque numa célula para alocar',
+                            '${_progressSubtitle(selected, loads, aulas)} · '
+                            'toque na célula para editar',
                             style: const TextStyle(fontSize: 13),
                           ),
                         ),
+                        if (_busy) const LinearProgressIndicator(minHeight: 2),
                         Expanded(
                           child: TimetableGrid(
                             buildCell: (slot) => _scheduleCell(
@@ -348,14 +611,18 @@ class _Page3State extends ConsumerState<Page3> {
                               bySlot: bySlot,
                               subjects: subjectMap,
                               professors: professorMap,
+                              roomsById: roomsMap,
                               courseSubjects: courseSubjects,
                               allProfessors: professors,
                               links: links,
                               allAulas: aulas,
                               loads: loads,
+                              unavailability: unavailability,
+                              rooms: rooms,
                             ),
                           ),
                         ),
+                        _validationPanel(validation: validation),
                       ],
                     );
                   },

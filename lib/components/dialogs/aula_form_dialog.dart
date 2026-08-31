@@ -1,37 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test_project/model/professor/professor.dart';
+import 'package:flutter_test_project/model/room/room.dart';
 import 'package:flutter_test_project/model/subject/subject.dart';
 
 class AulaFormResult {
   const AulaFormResult({
     required this.subjectId,
     required this.professorId,
+    this.roomId,
   });
 
   final String subjectId;
   final String professorId;
-}
-
-Future<AulaFormResult?> showAulaFormDialog(
-  BuildContext context, {
-  required String title,
-  required List<Subject> subjects,
-  required List<Professor> Function(String subjectId) professorsForSubject,
-  String? initialSubjectId,
-  String? initialProfessorId,
-  bool allowDelete = false,
-}) {
-  return showDialog<AulaFormResult>(
-    context: context,
-    builder: (context) => _AulaFormDialog(
-      title: title,
-      subjects: subjects,
-      professorsForSubject: professorsForSubject,
-      initialSubjectId: initialSubjectId,
-      initialProfessorId: initialProfessorId,
-      allowDelete: allowDelete,
-    ),
-  );
+  final String? roomId;
 }
 
 /// Returned when the user confirms delete (only if [allowDelete]).
@@ -44,17 +25,21 @@ Future<Object?> showAulaFormDialogWithDelete(
   required String title,
   required List<Subject> subjects,
   required List<Professor> Function(String subjectId) professorsForSubject,
+  required List<Room> rooms,
   String? initialSubjectId,
   String? initialProfessorId,
+  String? initialRoomId,
 }) {
   return showDialog<Object>(
     context: context,
     builder: (context) => _AulaFormDialog(
       title: title,
       subjects: subjects,
+      rooms: rooms,
       professorsForSubject: professorsForSubject,
       initialSubjectId: initialSubjectId,
       initialProfessorId: initialProfessorId,
+      initialRoomId: initialRoomId,
       allowDelete: true,
     ),
   );
@@ -64,17 +49,21 @@ class _AulaFormDialog extends StatefulWidget {
   const _AulaFormDialog({
     required this.title,
     required this.subjects,
+    required this.rooms,
     required this.professorsForSubject,
     this.initialSubjectId,
     this.initialProfessorId,
+    this.initialRoomId,
     this.allowDelete = false,
   });
 
   final String title;
   final List<Subject> subjects;
+  final List<Room> rooms;
   final List<Professor> Function(String subjectId) professorsForSubject;
   final String? initialSubjectId;
   final String? initialProfessorId;
+  final String? initialRoomId;
   final bool allowDelete;
 
   @override
@@ -84,6 +73,7 @@ class _AulaFormDialog extends StatefulWidget {
 class _AulaFormDialogState extends State<_AulaFormDialog> {
   String? _subjectId;
   String? _professorId;
+  String? _roomId;
   String? _error;
 
   @override
@@ -91,6 +81,7 @@ class _AulaFormDialogState extends State<_AulaFormDialog> {
     super.initState();
     _subjectId = widget.initialSubjectId;
     _professorId = widget.initialProfessorId;
+    _roomId = widget.initialRoomId;
   }
 
   List<Professor> get _professors {
@@ -111,7 +102,11 @@ class _AulaFormDialogState extends State<_AulaFormDialog> {
       return;
     }
     Navigator.of(context).pop(
-      AulaFormResult(subjectId: subjectId, professorId: professorId),
+      AulaFormResult(
+        subjectId: subjectId,
+        professorId: professorId,
+        roomId: _roomId,
+      ),
     );
   }
 
@@ -176,10 +171,31 @@ class _AulaFormDialogState extends State<_AulaFormDialog> {
                 const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Text(
-                    'Nenhum professor vinculado a esta matéria.',
+                    'Nenhum professor disponível neste horário.',
                     style: TextStyle(color: Colors.red),
                   ),
                 ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                key: ValueKey('room-$_roomId'),
+                initialValue: _roomId,
+                decoration: const InputDecoration(
+                  labelText: 'Sala (opcional)',
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Nenhuma'),
+                  ),
+                  ...widget.rooms.map(
+                    (room) => DropdownMenuItem<String?>(
+                      value: room.id,
+                      child: Text('Sala ${room.number}'),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setState(() => _roomId = value),
+              ),
             ],
             if (_error != null)
               Padding(

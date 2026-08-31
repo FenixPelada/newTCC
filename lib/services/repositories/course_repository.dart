@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_test_project/model/course/course.dart';
+import 'package:flutter_test_project/model/course/course_period_preference.dart';
 import 'package:flutter_test_project/model/course/course_subject_load.dart';
 
 class CourseRepository {
@@ -13,8 +14,6 @@ class CourseRepository {
   static const String _table = 'tb_curso';
   static const String _loadTable = 'tb_curso_materia';
 
-  /// REST fetch first; Realtime only refreshes when available.
-  /// Avoids empty/error UI when the table is not in the realtime publication.
   Stream<List<Course>> watchAll() {
     return _watchTable<Course>(
       table: _table,
@@ -105,11 +104,18 @@ class CourseRepository {
 
   Future<String> add(
     String name, {
+    String? roomId,
+    CoursePeriodPreference periodPreference = CoursePeriodPreference.manha,
     List<CourseSubjectLoad> loads = const [],
   }) async {
+    final payload = <String, dynamic>{
+      'nome': name,
+      'id_sala': roomId == null ? null : int.parse(roomId),
+      'periodo_preferencia': periodPreference.toDb(),
+    };
     final row = await _client
         .from(_table)
-        .insert({'nome': name})
+        .insert(payload)
         .select('id')
         .single();
     final id = row['id'].toString();
@@ -121,10 +127,12 @@ class CourseRepository {
     Course course, {
     List<CourseSubjectLoad>? loads,
   }) async {
-    await _client
-        .from(_table)
-        .update({'nome': course.name})
-        .eq('id', int.parse(course.id));
+    await _client.from(_table).update({
+      'nome': course.name,
+      'id_sala':
+          course.roomId == null ? null : int.parse(course.roomId!),
+      'periodo_preferencia': course.periodPreference.toDb(),
+    }).eq('id', int.parse(course.id));
     if (loads != null) {
       await setLoads(course.id, loads);
     }
@@ -143,6 +151,7 @@ class CourseRepository {
                   'id_curso': parsedCourseId,
                   'id_materia': int.parse(load.subjectId),
                   'quantidade_aulas': load.classCount,
+                  'tamanho_bloco': load.blockSize,
                 },
               )
               .toList(),

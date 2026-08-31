@@ -29,6 +29,8 @@ class ProfessorColumn extends ConsumerWidget {
             result.name,
             subjectIds: result.subjectIds,
           );
+      ref.invalidate(professorsProvider);
+      ref.invalidate(professorSubjectsProvider);
     } catch (e) {
       if (!context.mounted) return;
       _showError(context, e);
@@ -59,6 +61,8 @@ class ProfessorColumn extends ConsumerWidget {
             Professor(id: professor.id, name: result.name),
             subjectIds: result.subjectIds,
           );
+      ref.invalidate(professorsProvider);
+      ref.invalidate(professorSubjectsProvider);
     } catch (e) {
       if (!context.mounted) return;
       _showError(context, e);
@@ -79,6 +83,8 @@ class ProfessorColumn extends ConsumerWidget {
 
     try {
       await ref.read(professorRepositoryProvider).delete(professor.id);
+      ref.invalidate(professorsProvider);
+      ref.invalidate(professorSubjectsProvider);
     } catch (e) {
       if (!context.mounted) return;
       _showError(context, e);
