@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_test_project/components/board_column.dart';
-import 'package:flutter_test_project/components/item_card.dart';
-import 'package:flutter_test_project/components/timetable_grid.dart';
+import 'package:flutter_test_project/components/coluna_quadro.dart';
+import 'package:flutter_test_project/components/cartao_item.dart';
+import 'package:flutter_test_project/components/grade_horaria.dart';
 import 'package:flutter_test_project/model/professor/professor.dart';
-import 'package:flutter_test_project/model/professor/professor_unavailability.dart';
-import 'package:flutter_test_project/pages/baseLayout.dart';
+import 'package:flutter_test_project/model/professor/indisponibilidade_professor.dart';
+import 'package:flutter_test_project/pages/layout_base.dart';
 import 'package:flutter_test_project/providers/providers.dart';
 
 class Page2 extends ConsumerStatefulWidget {
@@ -16,76 +16,87 @@ class Page2 extends ConsumerStatefulWidget {
 }
 
 class _Page2State extends ConsumerState<Page2> {
-  Professor? _selectedProfessor;
-  bool _saving = false;
+  Professor? _professorSelecionado;
+  bool _salvando = false;
 
-  void _showError(Object e) {
+  void _mostrarErro(Object e) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Erro: $e')),
     );
   }
 
-  Set<TimetableSlot> _slotsForProfessor(
-    String professorId,
-    List<ProfessorUnavailability> rows,
+  Set<CelulaGrade> _celulasDoProfessor(
+    String idProfessor,
+    List<IndisponibilidadeProfessor> linhas,
   ) {
-    return rows
-        .where((r) => r.professorId == professorId)
-        .map((r) => r.slot)
+    return linhas
+        .where((r) => r.idProfessor == idProfessor)
+        .map((r) => r.celula)
         .toSet();
   }
 
-  Future<void> _toggleSlot(
-    TimetableSlot slot,
-    Set<TimetableSlot> current,
+  Future<void> _alternarCelula(
+    CelulaGrade celula,
+    Set<CelulaGrade> current,
   ) async {
-    final professor = _selectedProfessor;
-    if (professor == null || _saving) return;
+    final professor = _professorSelecionado;
+    if (professor == null || _salvando) return;
 
-    setState(() => _saving = true);
-    final repo = ref.read(professorUnavailabilityRepositoryProvider);
+    setState(() => _salvando = true);
+    final repo = ref.read(provedorRepositorioIndisponibilidade);
 
     try {
-      if (current.contains(slot)) {
-        await repo.deleteByProfessorSlot(
-          professorId: professor.id,
-          slot: slot,
+      if (current.contains(celula)) {
+        await repo.excluirPorProfessorCelula(
+          idProfessor: professor.id,
+          celula: celula,
         );
       } else {
-        await repo.add(professorId: professor.id, slot: slot);
+        await repo.adicionar(idProfessor: professor.id, celula: celula);
       }
-      ref.invalidate(professorUnavailabilityProvider);
+      ref.invalidate(provedorIndisponibilidades);
     } catch (e) {
-      _showError(e);
+      _mostrarErro(e);
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _salvando = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final professorsAsync = ref.watch(professorsProvider);
-    final unavailabilityAsync = ref.watch(professorUnavailabilityProvider);
-    final selected = _selectedProfessor;
-    final rows =
-        unavailabilityAsync.value ?? const <ProfessorUnavailability>[];
+    final professorsAsync = ref.watch(provedorProfessores);
+    final unavailabilityAsync = ref.watch(provedorIndisponibilidades);
+    final professores = professorsAsync.value ?? const <Professor>[];
+    final linhas =
+        unavailabilityAsync.value ?? const <IndisponibilidadeProfessor>[];
 
-    return BaseLayout(
-      title: 'Página 2',
+    // Se o professor foi excluído na Página 1, limpa a seleção.
+    final selecionado = _professorSelecionado != null &&
+            professores.any((p) => p.id == _professorSelecionado!.id)
+        ? _professorSelecionado
+        : null;
+    if (_professorSelecionado != null && selecionado == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _professorSelecionado = null);
+      });
+    }
+
+    return LayoutBase(
+      titulo: 'Página 2',
       body: Padding(
         padding: const EdgeInsets.all(8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (selected != null)
-              BoardColumn(
+            if (selecionado != null)
+              ColunaQuadro(
                 flex: 7,
-                title: 'Indisponibilidade — ${selected.name}',
-                icon: Icons.calendar_month_outlined,
-                actions: [
+                titulo: 'Indisponibilidade — ${selecionado.nome}',
+                icone: Icons.calendar_month_outlined,
+                acoes: [
                   IconButton(
-                    onPressed: () => setState(() => _selectedProfessor = null),
+                    onPressed: () => setState(() => _professorSelecionado = null),
                     tooltip: 'Fechar',
                     icon: const Icon(Icons.close, color: Colors.white),
                     visualDensity: VisualDensity.compact,
@@ -93,27 +104,27 @@ class _Page2State extends ConsumerState<Page2> {
                 ],
                 child: unavailabilityAsync.when(
                   data: (data) {
-                    final marked = _slotsForProfessor(selected.id, data);
+                    final marked = _celulasDoProfessor(selecionado.id, data);
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const Padding(
                           padding: EdgeInsets.fromLTRB(12, 12, 12, 0),
                           child: Text(
-                            'Selecione os dias indisponíveis para cada professor'
+                            'Toque nos horários indisponíveis. '
                             'Salvo no banco automaticamente.',
                             style: TextStyle(fontSize: 13),
                           ),
                         ),
-                        if (_saving)
+                        if (_salvando)
                           const LinearProgressIndicator(minHeight: 2),
                         Expanded(
-                          child: TimetableGrid(
-                            interactive: true,
-                            markedSlots: marked,
-                            onToggle: _saving
+                          child: GradeHoraria(
+                            interativo: true,
+                            celulasMarcadas: marked,
+                            aoAlternar: _salvando
                                 ? null
-                                : (slot) => _toggleSlot(slot, marked),
+                                : (celula) => _alternarCelula(celula, marked),
                           ),
                         ),
                       ],
@@ -121,8 +132,8 @@ class _Page2State extends ConsumerState<Page2> {
                   },
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => EmptyColumnHint(
-                    message:
+                  error: (e, _) => DicaColunaVazia(
+                    mensagem:
                         'Erro ao carregar indisponibilidade '
                         '(crie tb_professor_indisponibilidade no Supabase):\n$e',
                   ),
@@ -131,38 +142,38 @@ class _Page2State extends ConsumerState<Page2> {
             else
               const Expanded(
                 flex: 7,
-                child: EmptyColumnHint(
-                  message:
+                child: DicaColunaVazia(
+                  mensagem:
                       'Selecione um professor para marcar dias e horários indisponíveis',
                 ),
               ),
-            BoardColumn(
+            ColunaQuadro(
               flex: 3,
-              title: 'Professores',
-              icon: Icons.person_outline,
+              titulo: 'Professores',
+              icone: Icons.person_outline,
               child: professorsAsync.when(
-                data: (professors) {
-                  if (professors.isEmpty) {
-                    return const EmptyColumnHint(
-                      message: 'Nenhum professor cadastrado',
+                data: (professores) {
+                  if (professores.isEmpty) {
+                    return const DicaColunaVazia(
+                      mensagem: 'Nenhum professor cadastrado',
                     );
                   }
                   return ListView(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    children: professors.map((professor) {
-                      final isSelected = selected?.id == professor.id;
-                      final blocked = rows
-                          .where((r) => r.professorId == professor.id)
+                    children: professores.map((professor) {
+                      final isSelected = selecionado?.id == professor.id;
+                      final blocked = linhas
+                          .where((r) => r.idProfessor == professor.id)
                           .length;
-                      return ItemCard(
-                        title: professor.name,
-                        subtitle: blocked == 0
+                      return CartaoItem(
+                        titulo: professor.nome,
+                        subtitulo: blocked == 0
                             ? null
                             : '$blocked horário(s) bloqueado(s)',
-                        selected: isSelected,
-                        onTap: () {
+                        selecionado: isSelected,
+                        aoTocar: () {
                           setState(() {
-                            _selectedProfessor =
+                            _professorSelecionado =
                                 isSelected ? null : professor;
                           });
                         },
@@ -172,7 +183,7 @@ class _Page2State extends ConsumerState<Page2> {
                 },
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
-                error: (e, stack) => EmptyColumnHint(message: 'Erro: $e'),
+                error: (e, stack) => DicaColunaVazia(mensagem: 'Erro: $e'),
               ),
             ),
           ],

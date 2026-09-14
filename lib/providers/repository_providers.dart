@@ -1,34 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_test_project/services/repositories/aula_repository.dart';
-import 'package:flutter_test_project/services/repositories/course_repository.dart';
-import 'package:flutter_test_project/services/repositories/professor_repository.dart';
-import 'package:flutter_test_project/services/repositories/professor_unavailability_repository.dart';
-import 'package:flutter_test_project/services/repositories/room_repository.dart';
-import 'package:flutter_test_project/services/repositories/subject_repository.dart';
+import 'package:flutter_test_project/services/repositories/repositorio_aula.dart';
+import 'package:flutter_test_project/services/repositories/repositorio_curso.dart';
+import 'package:flutter_test_project/services/repositories/repositorio_professor.dart';
+import 'package:flutter_test_project/services/repositories/repositorio_indisponibilidade.dart';
+import 'package:flutter_test_project/services/repositories/repositorio_sala.dart';
+import 'package:flutter_test_project/services/repositories/repositorio_materia.dart';
 
 // providers que entregam os repositórios (acesso ao supabase)
 
-final roomRepositoryProvider = Provider<RoomRepository>(
-  (ref) => RoomRepository(),
+final provedorRepositorioSala = Provider<RepositorioSala>(
+  (ref) => RepositorioSala(),
 );
 
-final professorRepositoryProvider = Provider<ProfessorRepository>(
-  (ref) => ProfessorRepository(),
+final provedorRepositorioProfessor = Provider<RepositorioProfessor>(
+  (ref) => RepositorioProfessor(),
 );
 
-final subjectRepositoryProvider = Provider<SubjectRepository>(
-  (ref) => SubjectRepository(),
+final provedorRepositorioMateria = Provider<RepositorioMateria>(
+  (ref) => RepositorioMateria(),
 );
 
-final courseRepositoryProvider = Provider<CourseRepository>(
-  (ref) => CourseRepository(),
+final provedorRepositorioCurso = Provider<RepositorioCurso>(
+  (ref) => RepositorioCurso(),
 );
 
-final aulaRepositoryProvider = Provider<AulaRepository>(
-  (ref) => AulaRepository(),
+final provedorRepositorioAula = Provider<RepositorioAula>(
+  (ref) => RepositorioAula(),
 );
 
-final professorUnavailabilityRepositoryProvider =
-    Provider<ProfessorUnavailabilityRepository>(
-  (ref) => ProfessorUnavailabilityRepository(),
+final provedorRepositorioIndisponibilidade =
+    Provider<RepositorioIndisponibilidade>(
+  (ref) => RepositorioIndisponibilidade(),
 );

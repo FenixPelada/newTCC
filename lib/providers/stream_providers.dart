@@ -1,46 +1,46 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test_project/model/aula/aula.dart';
-import 'package:flutter_test_project/model/course/course.dart';
-import 'package:flutter_test_project/model/course/course_subject_load.dart';
+import 'package:flutter_test_project/model/curso/curso.dart';
+import 'package:flutter_test_project/model/curso/carga_curso_materia.dart';
 import 'package:flutter_test_project/model/professor/professor.dart';
-import 'package:flutter_test_project/model/professor/professor_subject.dart';
-import 'package:flutter_test_project/model/professor/professor_unavailability.dart';
-import 'package:flutter_test_project/model/room/room.dart';
-import 'package:flutter_test_project/model/subject/subject.dart';
+import 'package:flutter_test_project/model/professor/professor_materia.dart';
+import 'package:flutter_test_project/model/professor/indisponibilidade_professor.dart';
+import 'package:flutter_test_project/model/sala/sala.dart';
+import 'package:flutter_test_project/model/materia/materia.dart';
 import 'package:flutter_test_project/providers/repository_providers.dart';
 
 // streamProviders: escutam os streams realtime dos repos
 
 /// usa .when(loading:, error:, data:) pra renderizar
-final roomsProvider = StreamProvider<List<Room>>((ref) {
-  return ref.read(roomRepositoryProvider).watchAll();
+final provedorSalas = StreamProvider<List<Sala>>((ref) {
+  return ref.read(provedorRepositorioSala).observarTodos();
 });
 
-final professorsProvider = StreamProvider<List<Professor>>((ref) {
-  return ref.read(professorRepositoryProvider).watchAll();
+final provedorProfessores = StreamProvider<List<Professor>>((ref) {
+  return ref.read(provedorRepositorioProfessor).observarTodos();
 });
 
-final professorSubjectsProvider = StreamProvider<List<ProfessorSubject>>((ref) {
-  return ref.read(professorRepositoryProvider).watchSubjectLinks();
+final provedorProfessorMaterias = StreamProvider<List<ProfessorMateria>>((ref) {
+  return ref.read(provedorRepositorioProfessor).observarLigacoesMaterias();
 });
 
-final subjectsProvider = StreamProvider<List<Subject>>((ref) {
-  return ref.read(subjectRepositoryProvider).watchAll();
+final provedorMaterias = StreamProvider<List<Materia>>((ref) {
+  return ref.read(provedorRepositorioMateria).observarTodos();
 });
 
-final coursesProvider = StreamProvider<List<Course>>((ref) {
-  return ref.read(courseRepositoryProvider).watchAll();
+final provedorCursos = StreamProvider<List<Curso>>((ref) {
+  return ref.read(provedorRepositorioCurso).observarTodos();
 });
 
-final courseLoadsProvider = StreamProvider<List<CourseSubjectLoad>>((ref) {
-  return ref.read(courseRepositoryProvider).watchLoads();
+final provedorCargasCurso = StreamProvider<List<CargaCursoMateria>>((ref) {
+  return ref.read(provedorRepositorioCurso).observarCargas();
 });
 
-final aulasProvider = StreamProvider<List<Aula>>((ref) {
-  return ref.read(aulaRepositoryProvider).watchAll();
+final provedorAulas = StreamProvider<List<Aula>>((ref) {
+  return ref.read(provedorRepositorioAula).observarTodos();
 });
 
-final professorUnavailabilityProvider =
-    StreamProvider<List<ProfessorUnavailability>>((ref) {
-  return ref.read(professorUnavailabilityRepositoryProvider).watchAll();
+final provedorIndisponibilidades =
+    StreamProvider<List<IndisponibilidadeProfessor>>((ref) {
+  return ref.read(provedorRepositorioIndisponibilidade).observarTodos();
 });

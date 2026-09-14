@@ -1,10 +1,10 @@
-class Professor {
-  Professor({required this.id, required this.nome});
+class Materia {
+  Materia({required this.id, required this.nome});
 
   final String id;
   final String nome;
 
-  factory Professor.fromJson(Map<String, dynamic> json) => Professor(
+  factory Materia.fromJson(Map<String, dynamic> json) => Materia(
         id: json['id'].toString(),
         nome: json['nome'] as String,
       );
