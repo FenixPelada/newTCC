@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test_project/model/aula/aula.dart';
+import 'package:flutter_test_project/model/curso/aula_geminada_curso.dart';
 import 'package:flutter_test_project/model/curso/curso.dart';
 import 'package:flutter_test_project/model/curso/carga_curso_materia.dart';
 import 'package:flutter_test_project/model/professor/professor.dart';
@@ -36,11 +37,17 @@ final provedorCargasCurso = StreamProvider<List<CargaCursoMateria>>((ref) {
   return ref.read(provedorRepositorioCurso).observarCargas();
 });
 
+final provedorAulasGeminadasCurso = StreamProvider<List<AulaGeminadaCurso>>((
+  ref,
+) {
+  return ref.read(provedorRepositorioCurso).observarAulasGeminadas();
+});
+
 final provedorAulas = StreamProvider<List<Aula>>((ref) {
   return ref.read(provedorRepositorioAula).observarTodos();
 });
 
 final provedorIndisponibilidades =
     StreamProvider<List<IndisponibilidadeProfessor>>((ref) {
-  return ref.read(provedorRepositorioIndisponibilidade).observarTodos();
-});
+      return ref.read(provedorRepositorioIndisponibilidade).observarTodos();
+    });

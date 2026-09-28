@@ -1,5 +1,6 @@
 import 'package:flutter_test_project/components/grade_horaria.dart';
 import 'package:flutter_test_project/model/aula/aula.dart';
+import 'package:flutter_test_project/model/curso/aula_geminada_curso.dart';
 import 'package:flutter_test_project/model/curso/curso.dart';
 import 'package:flutter_test_project/model/curso/preferencia_periodo.dart';
 import 'package:flutter_test_project/model/curso/carga_curso_materia.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_test_project/model/professor/professor.dart';
 import 'package:flutter_test_project/model/professor/indisponibilidade_professor.dart';
 import 'package:flutter_test_project/model/sala/sala.dart';
 import 'package:flutter_test_project/model/materia/materia.dart';
+import 'package:flutter_test_project/pages/page3/helpers/regras_horario.dart';
 
 class ValidacaoHorario {
   const ValidacaoHorario({required this.problemas});
@@ -25,6 +27,7 @@ class ValidadorHorario {
     required List<Aula> todasAulas,
     required List<Curso> cursos,
     required List<CargaCursoMateria> cargas,
+    required List<AulaGeminadaCurso> aulasGeminadas,
     required List<Professor> professores,
     required List<Materia> materias,
     required List<Sala> salas,
@@ -57,6 +60,27 @@ class ValidadorHorario {
       }
     }
 
+    final limiteGrupos = maxGruposDoCurso(course, aulasGeminadas);
+    final porCelula = aulasPorCelulaDoCurso(courseAulas, idCurso);
+    for (final entry in porCelula.entries) {
+      if (entry.value.length > limiteGrupos) {
+        problemas.add(
+          entry.value.length > 1 && limiteGrupos == 1
+              ? '2 grupos em ${_rotuloCelula(entry.key)} sem aula geminada'
+              : 'Mais de $limiteGrupos grupos em ${_rotuloCelula(entry.key)}',
+        );
+      }
+      if (entry.value.length == 2 &&
+          !existeAulaGeminada(
+            idCurso: idCurso,
+            idMateriaA: entry.value.first.idMateria,
+            idMateriaB: entry.value.last.idMateria,
+            aulasGeminadas: aulasGeminadas,
+          )) {
+        problemas.add('Par não geminado em ${_rotuloCelula(entry.key)}');
+      }
+    }
+
     for (final aula in courseAulas) {
       final celula = aula.celula;
       final nomeProfessor =
@@ -69,18 +93,13 @@ class ValidadorHorario {
         );
       }
 
-      if (course.preferenciaPeriodo != PreferenciaPeriodo.contraturno) {
-        final isMorning = celula.indicePeriodo < GradeHoraria.quantidadePeriodosManha;
-        final wrongPeriod = switch (course.preferenciaPeriodo) {
-          PreferenciaPeriodo.manha => !isMorning,
-          PreferenciaPeriodo.tarde => isMorning,
-          PreferenciaPeriodo.contraturno => false,
-        };
-        if (wrongPeriod) {
-          problemas.add(
-            'Aula fora do período da turma (${_rotuloCelula(celula)})',
-          );
-        }
+      if (!_periodoCompativel(
+        course.preferenciaPeriodo,
+        celula.indicePeriodo,
+      )) {
+        problemas.add(
+          'Aula fora do período da turma (${_rotuloCelula(celula)})',
+        );
       }
 
       for (final other in todasAulas) {
@@ -90,25 +109,23 @@ class ValidadorHorario {
           continue;
         }
 
-        if (other.idProfessor == aula.idProfessor &&
-            other.idCurso != aula.idCurso) {
-          final otherCourse =
-              courseById[other.idCurso]?.nome ?? 'outro curso';
+        if (other.idProfessor == aula.idProfessor) {
+          final otherCourse = courseById[other.idCurso]?.nome ?? 'outro curso';
           problemas.add(
-            '$nomeProfessor já está dando aula no curso $otherCourse '
+            '$nomeProfessor já está dando aula'
+            '${other.idCurso == aula.idCurso ? ' (outro grupo)' : ' no curso $otherCourse'} '
             '(${_rotuloCelula(celula)})',
           );
         }
 
         final idSala = aula.idSala;
+        // Sala: só conflito com outra turma (mesma turma pode dividir a sala).
         if (idSala != null &&
             other.idSala == idSala &&
             other.idCurso != aula.idCurso) {
           final room = roomById[idSala];
-          final roomLabel =
-              room == null ? 'Sala' : 'Sala ${room.numero}';
-          final otherCourse =
-              courseById[other.idCurso]?.nome ?? 'outra turma';
+          final roomLabel = room == null ? 'Sala' : 'Sala ${room.numero}';
+          final otherCourse = courseById[other.idCurso]?.nome ?? 'outra turma';
           problemas.add(
             '$roomLabel ocupada por $otherCourse (${_rotuloCelula(celula)})',
           );
@@ -117,6 +134,15 @@ class ValidadorHorario {
     }
 
     return ValidacaoHorario(problemas: _deduplicar(problemas));
+  }
+
+  bool _periodoCompativel(PreferenciaPeriodo preferencia, int indicePeriodo) {
+    final faixa = GradeHoraria.faixaDoPeriodo(indicePeriodo);
+    return switch (preferencia) {
+      PreferenciaPeriodo.manha => faixa == 0,
+      PreferenciaPeriodo.tarde => faixa == 1,
+      PreferenciaPeriodo.contraturno => true,
+    };
   }
 
   bool _estaIndisponivel(

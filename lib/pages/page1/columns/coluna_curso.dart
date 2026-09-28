@@ -4,6 +4,7 @@ import 'package:flutter_test_project/components/coluna_quadro.dart';
 import 'package:flutter_test_project/components/dialogs/dialogo_confirmar_exclusao.dart';
 import 'package:flutter_test_project/components/dialogs/dialogo_formulario_curso.dart';
 import 'package:flutter_test_project/components/cartao_item.dart';
+import 'package:flutter_test_project/model/curso/aula_geminada_curso.dart';
 import 'package:flutter_test_project/model/curso/curso.dart';
 import 'package:flutter_test_project/model/sala/sala.dart';
 import 'package:flutter_test_project/model/materia/materia.dart';
@@ -32,14 +33,19 @@ class ColunaCurso extends ConsumerWidget {
     if (result == null) return;
 
     try {
-      await ref.read(provedorRepositorioCurso).adicionar(
+      await ref
+          .read(provedorRepositorioCurso)
+          .adicionar(
             result.nome,
             idSala: result.idSala,
             preferenciaPeriodo: result.preferenciaPeriodo,
+            turnoCompartilhado: result.aulasGeminadas.isNotEmpty,
             cargas: result.cargas,
+            aulasGeminadas: result.aulasGeminadas,
           );
       ref.invalidate(provedorCursos);
       ref.invalidate(provedorCargasCurso);
+      ref.invalidate(provedorAulasGeminadasCurso);
     } catch (e) {
       if (!context.mounted) return;
       _mostrarErro(context, e);
@@ -53,8 +59,9 @@ class ColunaCurso extends ConsumerWidget {
   ) async {
     final materias = _materiasOuVazio(ref.read(provedorMaterias));
     final salas = _salasOuVazio(ref.read(provedorSalas));
-    final cargas =
-        await ref.read(provedorRepositorioCurso).buscarCargas(course.id);
+    final repo = ref.read(provedorRepositorioCurso);
+    final cargas = await repo.buscarCargas(course.id);
+    final aulasGeminadas = await repo.buscarAulasGeminadas(course.id);
     if (!context.mounted) return;
 
     final result = await mostrarDialogoFormularioCurso(
@@ -66,22 +73,26 @@ class ColunaCurso extends ConsumerWidget {
       idSalaInicial: course.idSala,
       preferenciaPeriodoInicial: course.preferenciaPeriodo,
       cargasIniciais: cargas,
+      aulasGeminadasIniciais: aulasGeminadas,
       idCurso: course.id,
     );
     if (result == null) return;
 
     try {
-      await ref.read(provedorRepositorioCurso).atualizar(
-            Curso(
-              id: course.id,
-              nome: result.nome,
-              idSala: result.idSala,
-              preferenciaPeriodo: result.preferenciaPeriodo,
-            ),
-            cargas: result.cargas,
-          );
+      await repo.atualizar(
+        Curso(
+          id: course.id,
+          nome: result.nome,
+          idSala: result.idSala,
+          preferenciaPeriodo: result.preferenciaPeriodo,
+          turnoCompartilhado: result.aulasGeminadas.isNotEmpty,
+        ),
+        cargas: result.cargas,
+        aulasGeminadas: result.aulasGeminadas,
+      );
       ref.invalidate(provedorCursos);
       ref.invalidate(provedorCargasCurso);
+      ref.invalidate(provedorAulasGeminadasCurso);
       ref.invalidate(provedorAulas);
     } catch (e) {
       if (!context.mounted) return;
@@ -106,6 +117,7 @@ class ColunaCurso extends ConsumerWidget {
       await ref.read(provedorRepositorioCurso).excluir(course.id);
       ref.invalidate(provedorCursos);
       ref.invalidate(provedorCargasCurso);
+      ref.invalidate(provedorAulasGeminadasCurso);
       ref.invalidate(provedorAulas);
     } catch (e) {
       if (!context.mounted) return;
@@ -114,15 +126,16 @@ class ColunaCurso extends ConsumerWidget {
   }
 
   void _mostrarErro(BuildContext context, Object e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Erro: $e')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Erro: $e')));
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final coursesAsync = ref.watch(provedorCursos);
     final loadsAsync = ref.watch(provedorCargasCurso);
+    final geminatedAsync = ref.watch(provedorAulasGeminadasCurso);
     final roomsAsync = ref.watch(provedorSalas);
     final salasPorId = {
       for (final r in roomsAsync.value ?? const <Sala>[]) r.id: r,
@@ -146,22 +159,29 @@ class ColunaCurso extends ConsumerWidget {
           }
 
           final cargas = loadsAsync.value ?? const [];
+          final aulasGeminadas =
+              geminatedAsync.value ?? const <AulaGeminadaCurso>[];
           return ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: cursos.map((course) {
-              final courseLoads =
-                  cargas.where((load) => load.idCurso == course.id);
+              final courseLoads = cargas.where(
+                (load) => load.idCurso == course.id,
+              );
               final totalAulas = courseLoads.fold<int>(
                 0,
                 (sum, load) => sum + load.quantidadeAulas,
               );
               final materiaCount = courseLoads.length;
+              final geminatedCount = aulasGeminadas
+                  .where((pair) => pair.idCurso == course.id)
+                  .length;
               final room = course.idSala == null
                   ? null
                   : salasPorId[course.idSala!];
 
               final parts = <String>[
                 course.preferenciaPeriodo.rotulo,
+                if (geminatedCount > 0) '$geminatedCount aula(s) geminada(s)',
                 if (materiaCount == 0)
                   'Sem matérias'
                 else

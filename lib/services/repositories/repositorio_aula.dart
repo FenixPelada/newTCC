@@ -94,6 +94,7 @@ class RepositorioAula {
           'id_materia': int.parse(aula.idMateria),
           'id_professor': int.parse(aula.idProfessor),
           'id_sala': aula.idSala == null ? null : int.parse(aula.idSala!),
+          'grupo': aula.grupo,
         })
         .eq('id', int.parse(aula.id));
   }

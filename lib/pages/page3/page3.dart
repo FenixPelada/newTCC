@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test_project/components/coluna_quadro.dart';
 import 'package:flutter_test_project/components/grade_horaria.dart';
 import 'package:flutter_test_project/model/aula/aula.dart';
+import 'package:flutter_test_project/model/curso/aula_geminada_curso.dart';
 import 'package:flutter_test_project/model/curso/carga_curso_materia.dart';
 import 'package:flutter_test_project/model/curso/curso.dart';
 import 'package:flutter_test_project/model/materia/materia.dart';
@@ -34,9 +35,9 @@ class _Page3State extends ConsumerState<Page3> {
 
   void _mostrarMensagem(String mensagem) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensagem)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(mensagem)));
   }
 
   void _mostrarErro(Object e) => _mostrarMensagem('Erro: $e');
@@ -95,10 +96,7 @@ class _Page3State extends ConsumerState<Page3> {
         professores: professores,
         salas: salas,
       );
-      await Printing.layoutPdf(
-        onLayout: (_) async => bytes,
-        name: 'horarios',
-      );
+      await Printing.layoutPdf(onLayout: (_) async => bytes, name: 'horarios');
     } catch (e) {
       _mostrarErro(e);
     }
@@ -107,12 +105,12 @@ class _Page3State extends ConsumerState<Page3> {
   Future<void> _aoTocarCelula({
     required Curso curso,
     required CelulaGrade celula,
-    required Aula? existente,
     required List<Materia> materias,
     required List<Professor> professores,
     required List<ProfessorMateria> ligacoes,
     required List<Aula> aulas,
     required List<CargaCursoMateria> cargas,
+    required List<AulaGeminadaCurso> aulasGeminadas,
     required List<IndisponibilidadeProfessor> indisponibilidades,
     required List<Sala> salas,
   }) async {
@@ -123,13 +121,13 @@ class _Page3State extends ConsumerState<Page3> {
         context: context,
         celula: celula,
         curso: curso,
-        existente: existente,
         materiasCurso: materiasDoCurso(curso.id, cargas, materias),
         todasMaterias: materias,
         professores: professores,
         ligacoes: ligacoes,
         todasAulas: aulas,
         cargas: cargas,
+        aulasGeminadas: aulasGeminadas,
         indisponibilidades: indisponibilidades,
         salas: salas,
       );
@@ -144,6 +142,7 @@ class _Page3State extends ConsumerState<Page3> {
     final cursosAsync = ref.watch(provedorCursos);
     final aulasAsync = ref.watch(provedorAulas);
     final cargasAsync = ref.watch(provedorCargasCurso);
+    final aulasGeminadasAsync = ref.watch(provedorAulasGeminadasCurso);
     final materiasAsync = ref.watch(provedorMaterias);
     final professoresAsync = ref.watch(provedorProfessores);
     final ligacoesAsync = ref.watch(provedorProfessorMaterias);
@@ -152,6 +151,8 @@ class _Page3State extends ConsumerState<Page3> {
 
     final aulas = aulasAsync.value ?? const <Aula>[];
     final cargas = cargasAsync.value ?? const <CargaCursoMateria>[];
+    final aulasGeminadas =
+        aulasGeminadasAsync.value ?? const <AulaGeminadaCurso>[];
     final materias = materiasAsync.value ?? const <Materia>[];
     final professores = professoresAsync.value ?? const <Professor>[];
     final ligacoes = ligacoesAsync.value ?? const <ProfessorMateria>[];
@@ -160,7 +161,8 @@ class _Page3State extends ConsumerState<Page3> {
     final salas = salasAsync.value ?? const <Sala>[];
     final cursos = cursosAsync.value ?? const <Curso>[];
 
-    final selecionado = _cursoSelecionado != null &&
+    final selecionado =
+        _cursoSelecionado != null &&
             cursos.any((c) => c.id == _cursoSelecionado!.id)
         ? _cursoSelecionado
         : null;
@@ -183,6 +185,7 @@ class _Page3State extends ConsumerState<Page3> {
                 cursos: cursos,
                 aulas: aulas,
                 cargas: cargas,
+                aulasGeminadas: aulasGeminadas,
                 materias: materias,
                 professores: professores,
                 ligacoes: ligacoes,
@@ -192,38 +195,34 @@ class _Page3State extends ConsumerState<Page3> {
                 aoGerar: _ocupado || cursos.isEmpty
                     ? null
                     : () => _gerarTodos(
-                          cursos: cursos,
-                          cargas: cargas,
-                          professores: professores,
-                          ligacoes: ligacoes,
-                          indisponibilidades: indisponibilidades,
-                          materias: materias,
-                        ),
+                        cursos: cursos,
+                        cargas: cargas,
+                        professores: professores,
+                        ligacoes: ligacoes,
+                        indisponibilidades: indisponibilidades,
+                        materias: materias,
+                      ),
                 aoPdf: cursos.isEmpty
                     ? null
                     : () => _exportarPdf(
-                          cursos: cursos,
-                          aulas: aulas,
-                          materias: materias,
-                          professores: professores,
-                          salas: salas,
-                        ),
-                aoLimpar:
-                    _ocupado ? null : () => _limparCurso(selecionado),
+                        cursos: cursos,
+                        aulas: aulas,
+                        materias: materias,
+                        professores: professores,
+                        salas: salas,
+                      ),
+                aoLimpar: _ocupado ? null : () => _limparCurso(selecionado),
                 aoFechar: () => setState(() => _cursoSelecionado = null),
-                aoTocarCelula: ({
-                  required CelulaGrade celula,
-                  required Aula? existente,
-                }) =>
+                aoTocarCelula: ({required CelulaGrade celula}) =>
                     _aoTocarCelula(
                       curso: selecionado,
                       celula: celula,
-                      existente: existente,
                       materias: materias,
                       professores: professores,
                       ligacoes: ligacoes,
                       aulas: aulas,
                       cargas: cargas,
+                      aulasGeminadas: aulasGeminadas,
                       indisponibilidades: indisponibilidades,
                       salas: salas,
                     ),

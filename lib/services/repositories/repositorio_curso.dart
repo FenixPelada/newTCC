@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_test_project/model/curso/aula_geminada_curso.dart';
 import 'package:flutter_test_project/model/curso/curso.dart';
 import 'package:flutter_test_project/model/curso/preferencia_periodo.dart';
 import 'package:flutter_test_project/model/curso/carga_curso_materia.dart';
@@ -13,6 +14,7 @@ class RepositorioCurso {
 
   static const String _table = 'tb_curso';
   static const String _loadTable = 'tb_curso_materia';
+  static const String _geminatedTable = 'tb_curso_aula_geminada';
 
   Stream<List<Curso>> observarTodos() {
     return _watchTable<Curso>(
@@ -27,6 +29,14 @@ class RepositorioCurso {
       table: _loadTable,
       channelName: 'watch:$_loadTable',
       fetch: buscarTodasCargas,
+    );
+  }
+
+  Stream<List<AulaGeminadaCurso>> observarAulasGeminadas() {
+    return _watchTable<AulaGeminadaCurso>(
+      table: _geminatedTable,
+      channelName: 'watch:$_geminatedTable',
+      fetch: buscarTodasAulasGeminadas,
     );
   }
 
@@ -86,9 +96,7 @@ class RepositorioCurso {
   Future<List<CargaCursoMateria>> buscarTodasCargas() async {
     final data = await _client.from(_loadTable).select();
     return (data as List)
-        .map(
-          (row) => CargaCursoMateria.fromJson(row as Map<String, dynamic>),
-        )
+        .map((row) => CargaCursoMateria.fromJson(row as Map<String, dynamic>))
         .toList();
   }
 
@@ -102,16 +110,46 @@ class RepositorioCurso {
         .toList();
   }
 
+  Future<List<AulaGeminadaCurso>> buscarTodasAulasGeminadas() async {
+    try {
+      final data = await _client.from(_geminatedTable).select();
+      return (data as List)
+          .map((row) => AulaGeminadaCurso.fromJson(row as Map<String, dynamic>))
+          .toList();
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205') return const [];
+      rethrow;
+    }
+  }
+
+  Future<List<AulaGeminadaCurso>> buscarAulasGeminadas(String idCurso) async {
+    try {
+      final data = await _client
+          .from(_geminatedTable)
+          .select()
+          .eq('id_curso', int.parse(idCurso));
+      return (data as List)
+          .map((row) => AulaGeminadaCurso.fromJson(row as Map<String, dynamic>))
+          .toList();
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205') return const [];
+      rethrow;
+    }
+  }
+
   Future<String> adicionar(
     String nome, {
     String? idSala,
     PreferenciaPeriodo preferenciaPeriodo = PreferenciaPeriodo.manha,
+    bool turnoCompartilhado = false,
     List<CargaCursoMateria> cargas = const [],
+    List<AulaGeminadaCurso> aulasGeminadas = const [],
   }) async {
     final payload = <String, dynamic>{
       'nome': nome,
       'id_sala': idSala == null ? null : int.parse(idSala),
       'periodo_preferencia': preferenciaPeriodo.toDb(),
+      'turno_compartilhado': turnoCompartilhado,
     };
     final row = await _client
         .from(_table)
@@ -120,30 +158,74 @@ class RepositorioCurso {
         .single();
     final id = row['id'].toString();
     await definirCargas(id, cargas);
+    await definirAulasGeminadas(id, aulasGeminadas);
     return id;
   }
 
   Future<void> atualizar(
     Curso course, {
     List<CargaCursoMateria>? cargas,
+    List<AulaGeminadaCurso>? aulasGeminadas,
   }) async {
-    await _client.from(_table).update({
-      'nome': course.nome,
-      'id_sala':
-          course.idSala == null ? null : int.parse(course.idSala!),
-      'periodo_preferencia': course.preferenciaPeriodo.toDb(),
-    }).eq('id', int.parse(course.id));
+    await _client
+        .from(_table)
+        .update({
+          'nome': course.nome,
+          'id_sala': course.idSala == null ? null : int.parse(course.idSala!),
+          'periodo_preferencia': course.preferenciaPeriodo.toDb(),
+          'turno_compartilhado': course.turnoCompartilhado,
+        })
+        .eq('id', int.parse(course.id));
     if (cargas != null) {
       await definirCargas(course.id, cargas);
     }
+    if (aulasGeminadas != null) {
+      await definirAulasGeminadas(course.id, aulasGeminadas);
+    }
   }
 
-  Future<void> definirCargas(String idCurso, List<CargaCursoMateria> cargas) async {
+  Future<void> definirAulasGeminadas(
+    String idCurso,
+    List<AulaGeminadaCurso> aulasGeminadas,
+  ) async {
+    final parsedCourseId = int.parse(idCurso);
+    try {
+      await _client
+          .from(_geminatedTable)
+          .delete()
+          .eq('id_curso', parsedCourseId);
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205' && aulasGeminadas.isEmpty) return;
+      rethrow;
+    }
+
+    final unicas = <String, AulaGeminadaCurso>{};
+    for (final par in aulasGeminadas) {
+      unicas[par.chave] = par;
+    }
+
+    if (unicas.isEmpty) return;
+
+    await _client
+        .from(_geminatedTable)
+        .insert(
+          unicas.values
+              .map((par) => par.toInsertJson(idCursoOverride: idCurso))
+              .toList(),
+        );
+  }
+
+  Future<void> definirCargas(
+    String idCurso,
+    List<CargaCursoMateria> cargas,
+  ) async {
     final parsedCourseId = int.parse(idCurso);
     await _client.from(_loadTable).delete().eq('id_curso', parsedCourseId);
 
     if (cargas.isNotEmpty) {
-      await _client.from(_loadTable).insert(
+      await _client
+          .from(_loadTable)
+          .insert(
             cargas
                 .map(
                   (load) => {
@@ -176,6 +258,11 @@ class RepositorioCurso {
     final parsedId = int.parse(id);
     await _client.from('tb_aula').delete().eq('id_curso', parsedId);
     await _client.from(_loadTable).delete().eq('id_curso', parsedId);
+    try {
+      await _client.from(_geminatedTable).delete().eq('id_curso', parsedId);
+    } on PostgrestException catch (e) {
+      if (e.code != 'PGRST205') rethrow;
+    }
     await _client.from(_table).delete().eq('id', parsedId);
   }
 }

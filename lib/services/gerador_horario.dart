@@ -35,7 +35,7 @@ class ResultadoGeracaoCompleta {
   bool get completo => falhas.isEmpty;
 }
 
-/// Coloca aulas em blocos de 1 ou 2, respeitando turno, sala e indisponibilidade.
+/// Coloca aulas em blocos configuráveis, respeitando turno, sala e indisponibilidade.
 class GeradorHorario {
   const GeradorHorario();
 
@@ -72,15 +72,10 @@ class GeradorHorario {
       trabalhando.addAll(resultado.novasAulas);
       novasAulas.addAll(resultado.novasAulas);
       final rotuloCurso = nomesCursos[curso.id] ?? curso.nome;
-      falhas.addAll(
-        resultado.falhas.map((f) => '$rotuloCurso: $f'),
-      );
+      falhas.addAll(resultado.falhas.map((f) => '$rotuloCurso: $f'));
     }
 
-    return ResultadoGeracaoCompleta(
-      novasAulas: novasAulas,
-      falhas: falhas,
-    );
+    return ResultadoGeracaoCompleta(novasAulas: novasAulas, falhas: falhas);
   }
 
   ResultadoGeracao gerar({
@@ -93,10 +88,11 @@ class GeradorHorario {
     Map<String, String> nomesMaterias = const {},
   }) {
     final idCurso = curso.id;
-    final cargasCurso =
-        cargas.where((l) => l.idCurso == idCurso).toList();
-    final totalNecessario =
-        cargasCurso.fold<int>(0, (soma, l) => soma + l.quantidadeAulas);
+    final cargasCurso = cargas.where((l) => l.idCurso == idCurso).toList();
+    final totalNecessario = cargasCurso.fold<int>(
+      0,
+      (soma, l) => soma + l.quantidadeAulas,
+    );
 
     if (cargasCurso.isEmpty) {
       return const ResultadoGeracao(
@@ -112,10 +108,12 @@ class GeradorHorario {
     final falhas = <String>[];
 
     cargasCurso.sort((a, b) {
-      final contagemA =
-          ligacoes.where((l) => l.idMateria == a.idMateria).length;
-      final contagemB =
-          ligacoes.where((l) => l.idMateria == b.idMateria).length;
+      final contagemA = ligacoes
+          .where((l) => l.idMateria == a.idMateria)
+          .length;
+      final contagemB = ligacoes
+          .where((l) => l.idMateria == b.idMateria)
+          .length;
       return contagemA.compareTo(contagemB);
     });
 
@@ -124,9 +122,7 @@ class GeradorHorario {
 
     for (final carga in cargasCurso) {
       final jaAlocado = trabalhando
-          .where(
-            (a) => a.idCurso == idCurso && a.idMateria == carga.idMateria,
-          )
+          .where((a) => a.idCurso == idCurso && a.idMateria == carga.idMateria)
           .length;
       var restante = carga.quantidadeAulas - jaAlocado;
       if (restante <= 0) continue;
@@ -156,11 +152,11 @@ class GeradorHorario {
         for (final faixaPeriodos in fasesPeriodo) {
           if (alocado) break;
 
-          for (var dia = 0;
-              dia < GradeHoraria.dias.length && !alocado;
-              dia++) {
-            for (final periodoInicio
-                in _periodosInicio(faixaPeriodos, tamanhoBloco)) {
+          for (var dia = 0; dia < GradeHoraria.dias.length && !alocado; dia++) {
+            for (final periodoInicio in _periodosInicio(
+              faixaPeriodos,
+              tamanhoBloco,
+            )) {
               if (_tentarColocarBloco(
                 idCurso: idCurso,
                 idMateria: carga.idMateria,
@@ -190,15 +186,13 @@ class GeradorHorario {
       }
 
       if (restante > 0) {
-        falhas.add(
-          'Faltam $restante aula(s) de ${rotulo(carga.idMateria)}.',
-        );
+        falhas.add('Faltam $restante aula(s) de ${rotulo(carga.idMateria)}.');
       }
     }
 
     final totalAlocado =
         aulasExistentes.where((a) => a.idCurso == idCurso).length +
-            novasAulas.length;
+        novasAulas.length;
 
     return ResultadoGeracao(
       novasAulas: novasAulas,
@@ -215,17 +209,13 @@ class GeradorHorario {
   }
 
   List<int> _blocosPara(int total, int blocoPreferido) {
-    final tamanho = blocoPreferido == 2 ? 2 : 1;
+    final tamanho = blocoPreferido.clamp(1, total).toInt();
     final blocos = <int>[];
     var restante = total;
     while (restante > 0) {
-      if (tamanho == 2 && restante >= 2) {
-        blocos.add(2);
-        restante -= 2;
-      } else {
-        blocos.add(1);
-        restante -= 1;
-      }
+      final tamanhoAtual = restante >= tamanho ? tamanho : restante;
+      blocos.add(tamanhoAtual);
+      restante -= tamanhoAtual;
     }
     return blocos;
   }
@@ -233,10 +223,11 @@ class GeradorHorario {
   List<List<int>> _fasesPeriodo(PreferenciaPeriodo preferencia) {
     const manha = [0, 1, 2, 3, 4, 5];
     const tarde = [6, 7, 8, 9, 10, 11];
+    const contraturno = [12, 13];
     return switch (preferencia) {
       PreferenciaPeriodo.manha => [manha],
       PreferenciaPeriodo.tarde => [tarde],
-      PreferenciaPeriodo.contraturno => [manha, tarde],
+      PreferenciaPeriodo.contraturno => [manha, tarde, contraturno],
     };
   }
 
@@ -317,11 +308,11 @@ class GeradorHorario {
       return false;
     }
 
-    final eManha = periodoInicio < GradeHoraria.quantidadePeriodosManha;
     for (var deslocamento = 0; deslocamento < tamanhoBloco; deslocamento++) {
       final periodo = periodoInicio + deslocamento;
-      final periodoEManha = periodo < GradeHoraria.quantidadePeriodosManha;
-      if (periodoEManha != eManha) return false;
+      if (!GradeHoraria.periodosNaMesmaFaixa(periodoInicio, periodo)) {
+        return false;
+      }
 
       final celula = CelulaGrade(indiceDia: dia, indicePeriodo: periodo);
 
@@ -343,9 +334,11 @@ class GeradorHorario {
         return false;
       }
 
+      // Conflito de sala só com outra turma (grupos da mesma turma podem dividir).
       if (idSala != null &&
           trabalhando.any(
             (a) =>
+                a.idCurso != idCurso &&
                 a.idSala == idSala &&
                 a.indiceDia == dia &&
                 a.indicePeriodo == periodo,

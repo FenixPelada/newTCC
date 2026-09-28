@@ -29,9 +29,13 @@ class ExportadorHorarioPdf {
       ..sort((a, b) => a.nome.compareTo(b.nome));
 
     for (final curso in listaCursos) {
-      final porCelula = {
-        for (final a in aulas.where((a) => a.idCurso == curso.id)) a.celula: a,
-      };
+      final porCelula = <CelulaGrade, List<Aula>>{};
+      for (final a in aulas.where((a) => a.idCurso == curso.id)) {
+        porCelula.putIfAbsent(a.celula, () => []).add(a);
+      }
+      for (final lista in porCelula.values) {
+        lista.sort((a, b) => a.grupo.compareTo(b.grupo));
+      }
       final salaPadrao = curso.idSala == null ? null : mapaSalas[curso.idSala!];
 
       doc.addPage(
@@ -85,7 +89,7 @@ class ExportadorHorarioPdf {
   }
 
   pw.Widget _tabelaGrade({
-    required Map<CelulaGrade, Aula> porCelula,
+    required Map<CelulaGrade, List<Aula>> porCelula,
     required Map<String, String> mapaMaterias,
     required Map<String, String> mapaProfessores,
     required Map<String, Sala> mapaSalas,
@@ -122,7 +126,26 @@ class ExportadorHorarioPdf {
               _celulaTexto('', centralizado: true),
           ],
         ),
-        for (var i = GradeHoraria.quantidadePeriodosManha;
+        for (var i = GradeHoraria.inicioTarde;
+            i < GradeHoraria.inicioContraturno;
+            i++)
+          _linhaPeriodo(
+            rotulo: GradeHoraria.periodos[i],
+            indicePeriodo: i,
+            porCelula: porCelula,
+            mapaMaterias: mapaMaterias,
+            mapaProfessores: mapaProfessores,
+            mapaSalas: mapaSalas,
+          ),
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          children: [
+            _celulaTexto('Contraturno', negrito: true, centralizado: true),
+            for (var d = 0; d < GradeHoraria.dias.length; d++)
+              _celulaTexto('', centralizado: true),
+          ],
+        ),
+        for (var i = GradeHoraria.inicioContraturno;
             i < GradeHoraria.periodos.length;
             i++)
           _linhaPeriodo(
@@ -140,7 +163,7 @@ class ExportadorHorarioPdf {
   pw.TableRow _linhaPeriodo({
     required String rotulo,
     required int indicePeriodo,
-    required Map<CelulaGrade, Aula> porCelula,
+    required Map<CelulaGrade, List<Aula>> porCelula,
     required Map<String, String> mapaMaterias,
     required Map<String, String> mapaProfessores,
     required Map<String, Sala> mapaSalas,
@@ -149,8 +172,9 @@ class ExportadorHorarioPdf {
       children: [
         _celulaTexto(rotulo, negrito: true, centralizado: true),
         for (var dia = 0; dia < GradeHoraria.dias.length; dia++)
-          _celulaAula(
-            porCelula[CelulaGrade(indiceDia: dia, indicePeriodo: indicePeriodo)],
+          _celulaAulas(
+            porCelula[CelulaGrade(indiceDia: dia, indicePeriodo: indicePeriodo)] ??
+                const [],
             mapaMaterias: mapaMaterias,
             mapaProfessores: mapaProfessores,
             mapaSalas: mapaSalas,
@@ -183,49 +207,40 @@ class ExportadorHorarioPdf {
     );
   }
 
-  pw.Widget _celulaAula(
-    Aula? aula, {
+  pw.Widget _celulaAulas(
+    List<Aula> aulas, {
     required Map<String, String> mapaMaterias,
     required Map<String, String> mapaProfessores,
     required Map<String, Sala> mapaSalas,
   }) {
-    if (aula == null) {
+    if (aulas.isEmpty) {
       return pw.Padding(
         padding: const pw.EdgeInsets.all(3),
         child: pw.SizedBox(height: 28),
       );
     }
 
-    final materia = mapaMaterias[aula.idMateria] ?? 'Matéria';
-    final professor = mapaProfessores[aula.idProfessor] ?? 'Professor';
-    final sala = aula.idSala == null ? null : mapaSalas[aula.idSala!];
-
     return pw.Container(
       color: PdfColors.green50,
-      padding: const pw.EdgeInsets.all(3),
+      padding: const pw.EdgeInsets.all(2),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.center,
         mainAxisAlignment: pw.MainAxisAlignment.center,
         children: [
-          pw.Text(
-            materia,
-            textAlign: pw.TextAlign.center,
-            maxLines: 1,
-            style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.Text(
-            professor,
-            textAlign: pw.TextAlign.center,
-            maxLines: 1,
-            style: const pw.TextStyle(fontSize: 6.5),
-          ),
-          if (sala != null)
+          for (final aula in aulas) ...[
             pw.Text(
-              'Sala ${sala.numero}',
+              'G${aula.grupo} ${mapaMaterias[aula.idMateria] ?? 'Matéria'}',
               textAlign: pw.TextAlign.center,
               maxLines: 1,
               style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold),
             ),
+            pw.Text(
+              mapaProfessores[aula.idProfessor] ?? 'Professor',
+              textAlign: pw.TextAlign.center,
+              maxLines: 1,
+              style: const pw.TextStyle(fontSize: 6),
+            ),
+          ],
         ],
       ),
     );

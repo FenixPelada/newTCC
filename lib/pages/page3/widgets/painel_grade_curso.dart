@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test_project/components/coluna_quadro.dart';
 import 'package:flutter_test_project/components/grade_horaria.dart';
 import 'package:flutter_test_project/model/aula/aula.dart';
+import 'package:flutter_test_project/model/curso/aula_geminada_curso.dart';
 import 'package:flutter_test_project/model/curso/carga_curso_materia.dart';
 import 'package:flutter_test_project/model/curso/curso.dart';
 import 'package:flutter_test_project/model/materia/materia.dart';
@@ -23,6 +24,7 @@ class PainelGradeCurso extends ConsumerWidget {
     required this.cursos,
     required this.aulas,
     required this.cargas,
+    required this.aulasGeminadas,
     required this.materias,
     required this.professores,
     required this.ligacoes,
@@ -40,6 +42,7 @@ class PainelGradeCurso extends ConsumerWidget {
   final List<Curso> cursos;
   final List<Aula> aulas;
   final List<CargaCursoMateria> cargas;
+  final List<AulaGeminadaCurso> aulasGeminadas;
   final List<Materia> materias;
   final List<Professor> professores;
   final List<ProfessorMateria> ligacoes;
@@ -50,10 +53,7 @@ class PainelGradeCurso extends ConsumerWidget {
   final VoidCallback? aoPdf;
   final VoidCallback? aoLimpar;
   final VoidCallback aoFechar;
-  final Future<void> Function({
-    required CelulaGrade celula,
-    required Aula? existente,
-  }) aoTocarCelula;
+  final Future<void> Function({required CelulaGrade celula}) aoTocarCelula;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -99,10 +99,7 @@ class PainelGradeCurso extends ConsumerWidget {
       ],
       child: aulasAsync.when(
         data: (_) {
-          final porCelula = {
-            for (final a in aulas.where((a) => a.idCurso == curso.id))
-              a.celula: a,
-          };
+          final porCelula = aulasPorCelulaDoCurso(aulas, curso.id);
           final mapaMaterias = materiaPorId(materias);
           final mapaProfessores = professorPorId(professores);
           final mapaSalas = salaPorId(salas);
@@ -112,6 +109,7 @@ class PainelGradeCurso extends ConsumerWidget {
             todasAulas: aulas,
             cursos: cursos,
             cargas: cargas,
+            aulasGeminadas: aulasGeminadas,
             professores: professores,
             materias: materias,
             salas: salas,
@@ -124,8 +122,7 @@ class PainelGradeCurso extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                 child: Text(
-                  '${subtituloProgresso(curso, cargas, aulas)} · '
-                  'toque na célula para editar',
+                  subtituloProgresso(curso, cargas, aulas),
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
@@ -133,18 +130,14 @@ class PainelGradeCurso extends ConsumerWidget {
               Expanded(
                 child: GradeHoraria(
                   construirCelula: (celula) {
-                    final aula = porCelula[celula];
                     return CelulaHorario(
                       celula: celula,
-                      porCelula: porCelula,
+                      aulas: porCelula[celula] ?? const [],
                       materias: mapaMaterias,
                       professores: mapaProfessores,
                       salasPorId: mapaSalas,
                       ocupado: ocupado,
-                      aoTocar: () => aoTocarCelula(
-                        celula: celula,
-                        existente: aula,
-                      ),
+                      aoTocar: () => aoTocarCelula(celula: celula),
                     );
                   },
                 ),

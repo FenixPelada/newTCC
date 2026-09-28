@@ -4,6 +4,7 @@ import 'package:flutter_test_project/components/dialogs/dialogo_confirmar_exclus
 import 'package:flutter_test_project/components/dialogs/dialogo_formulario_aula.dart';
 import 'package:flutter_test_project/components/grade_horaria.dart';
 import 'package:flutter_test_project/model/aula/aula.dart';
+import 'package:flutter_test_project/model/curso/aula_geminada_curso.dart';
 import 'package:flutter_test_project/model/curso/carga_curso_materia.dart';
 import 'package:flutter_test_project/model/curso/curso.dart';
 import 'package:flutter_test_project/model/materia/materia.dart';
@@ -90,27 +91,88 @@ class AcoesHorario {
     required BuildContext context,
     required CelulaGrade celula,
     required Curso curso,
-    required Aula? existente,
     required List<Materia> materiasCurso,
     required List<Materia> todasMaterias,
     required List<Professor> professores,
     required List<ProfessorMateria> ligacoes,
     required List<Aula> todasAulas,
     required List<CargaCursoMateria> cargas,
+    required List<AulaGeminadaCurso> aulasGeminadas,
     required List<IndisponibilidadeProfessor> indisponibilidades,
     required List<Sala> salas,
   }) async {
+    final naCelula = aulasNaCelula(todasAulas, curso.id, celula);
+    final mapaMaterias = materiaPorId(todasMaterias);
+
+    Aula? existente;
+    var grupo = 1;
+    String? materiaBaseGeminada;
+
+    if (naCelula.isEmpty) {
+      grupo = 1;
+    } else if (naCelula.length == 1) {
+      final materiasPermitidas = materiasGeminadasCom(
+        idCurso: curso.id,
+        idMateria: naCelula.first.idMateria,
+        aulasGeminadas: aulasGeminadas,
+      );
+      if (materiasPermitidas.isEmpty) {
+        existente = naCelula.first;
+        grupo = existente.grupo;
+      } else {
+        final escolha = await _escolherAcaoCelulaComUmaAula(
+          context,
+          naCelula.first,
+          mapaMaterias,
+        );
+        if (escolha == null) return null;
+        if (escolha == _AcaoCelula.editar) {
+          existente = naCelula.first;
+          grupo = existente.grupo;
+        } else {
+          final livre = proximoGrupoLivre(naCelula);
+          if (livre == null) {
+            return 'Este horário já tem $maxGruposPorCelula grupos.';
+          }
+          grupo = livre;
+          materiaBaseGeminada = naCelula.first.idMateria;
+        }
+      }
+    } else {
+      final escolhida = await _escolherGrupoParaEditar(
+        context,
+        naCelula,
+        mapaMaterias,
+      );
+      if (escolhida == null) return null;
+      existente = escolhida;
+      grupo = escolhida.grupo;
+    }
+
+    if (!context.mounted) return null;
+
     final rotuloDia = GradeHoraria.dias[celula.indiceDia];
     final rotuloPeriodo = GradeHoraria.periodos[celula.indicePeriodo];
     final titulo = existente == null
-        ? 'Nova aula — $rotuloDia $rotuloPeriodo'
-        : 'Editar aula — $rotuloDia $rotuloPeriodo';
+        ? 'Nova aula — $rotuloDia $rotuloPeriodo · Grupo $grupo'
+        : 'Editar — $rotuloDia $rotuloPeriodo · Grupo $grupo';
+    final materiasPermitidas = materiaBaseGeminada == null
+        ? materiasCurso
+        : materiasCurso
+              .where(
+                (materia) => materiasGeminadasCom(
+                  idCurso: curso.id,
+                  idMateria: materiaBaseGeminada!,
+                  aulasGeminadas: aulasGeminadas,
+                ).contains(materia.id),
+              )
+              .toList();
 
     final resultado = await mostrarDialogoFormularioAula(
       context,
       titulo: titulo,
       materias: materiasParaDialogoAula(
-        materiasCurso: materiasCurso,
+        materiasCurso: materiasPermitidas,
         todasMaterias: todasMaterias,
         existente: existente,
       ),
@@ -130,7 +192,7 @@ class AcoesHorario {
       permitirExcluir: existente != null,
       mensagemExclusao: existente == null
           ? null
-          : 'Excluir a aula de $rotuloDia $rotuloPeriodo?',
+          : 'Excluir a aula do grupo $grupo em $rotuloDia $rotuloPeriodo?',
     );
 
     if (resultado == null) return null;
@@ -151,7 +213,9 @@ class AcoesHorario {
       idProfessor: resultado.idProfessor,
       idSala: resultado.idSala,
       existente: existente,
+      grupo: grupo,
       cargas: cargas,
+      aulasGeminadas: aulasGeminadas,
       todasAulas: todasAulas,
       ligacoes: ligacoes,
       indisponibilidades: indisponibilidades,
@@ -166,6 +230,7 @@ class AcoesHorario {
       idMateria: resultado.idMateria,
       idProfessor: resultado.idProfessor,
       idSala: resultado.idSala,
+      grupo: grupo,
     );
 
     if (existente == null) {
@@ -176,4 +241,61 @@ class AcoesHorario {
     ref.invalidate(provedorAulas);
     return null;
   }
+
+  Future<_AcaoCelula?> _escolherAcaoCelulaComUmaAula(
+    BuildContext context,
+    Aula aula,
+    Map<String, Materia> materias,
+  ) {
+    final nome = materias[aula.idMateria]?.nome ?? 'aula';
+    return showDialog<_AcaoCelula>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text('Horário — Grupo ${aula.grupo} ($nome)'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, _AcaoCelula.editar),
+            child: const Text('Editar este grupo'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, _AcaoCelula.adicionarGrupo),
+            child: const Text('Adicionar 2º grupo'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<Aula?> _escolherGrupoParaEditar(
+    BuildContext context,
+    List<Aula> aulas,
+    Map<String, Materia> materias,
+  ) {
+    return showDialog<Aula>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Qual grupo editar?'),
+        children: [
+          for (final aula in aulas)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, aula),
+              child: Text(
+                'Grupo ${aula.grupo} — '
+                '${materias[aula.idMateria]?.nome ?? 'Matéria'}',
+              ),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
+enum _AcaoCelula { editar, adicionarGrupo }
