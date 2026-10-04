@@ -6,6 +6,8 @@ import 'package:flutter_test_project/model/curso/carga_curso_materia.dart';
 import 'package:flutter_test_project/model/sala/sala.dart';
 import 'package:flutter_test_project/model/materia/materia.dart';
 
+const int _maxAulasGeminadasPorCurso = 10;
+
 class ResultadoFormularioCurso {
   const ResultadoFormularioCurso({
     required this.nome,
@@ -144,6 +146,7 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
   void _adicionarLinha() => setState(() => _linhas.add(_LinhaCarga()));
 
   void _adicionarLinhaGeminada() {
+    if (_linhasGeminadas.length >= _maxAulasGeminadasPorCurso) return;
     setState(() => _linhasGeminadas.add(_LinhaAulaGeminada()));
   }
 
@@ -230,6 +233,13 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
     final idsCargas = cargas.map((carga) => carga.idMateria).toSet();
     final aulasGeminadas = <AulaGeminadaCurso>[];
     final paresVistos = <String>{};
+    if (_linhasGeminadas.length > _maxAulasGeminadasPorCurso) {
+      setState(
+        () => _erro =
+            'Cadastre no máximo $_maxAulasGeminadasPorCurso aulas geminadas',
+      );
+      return;
+    }
     for (final row in _linhasGeminadas) {
       final idMateriaA = row.idMateriaA;
       final idMateriaB = row.idMateriaB;
@@ -277,7 +287,10 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
 
   Widget _secaoAulasGeminadas() {
     final materiasComCarga = _materiasComCarga();
-    final podeAdicionar = materiasComCarga.length >= 2;
+    final podeCadastrarPares = materiasComCarga.length >= 2;
+    final atingiuLimite =
+        _linhasGeminadas.length >= _maxAulasGeminadasPorCurso;
+    final podeAdicionar = podeCadastrarPares && !atingiuLimite;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -290,24 +303,34 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
+            Text(
+              '${_linhasGeminadas.length}/$_maxAulasGeminadasPorCurso',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(width: 8),
             TextButton.icon(
               onPressed: podeAdicionar ? _adicionarLinhaGeminada : null,
               icon: const Icon(Icons.add),
-              label: const Text('Par'),
+              label: const Text('Aula'),
             ),
           ],
         ),
         const SizedBox(height: 4),
         const Text(
-          'Permite duas matérias diferentes ao mesmo tempo apenas nesta turma.',
+          'Permite até 10 pares de matérias diferentes ao mesmo tempo apenas nesta turma.',
           style: TextStyle(fontSize: 12),
         ),
         const SizedBox(height: 8),
-        if (!podeAdicionar)
+        if (!podeCadastrarPares)
           const Text('Defina pelo menos duas matérias na carga do curso.')
-        else if (_linhasGeminadas.isEmpty)
+        else if (atingiuLimite)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text('Limite de 10 aulas geminadas atingido.'),
+          ),
+        if (podeCadastrarPares && _linhasGeminadas.isEmpty)
           const Text('Nenhum par geminado cadastrado.')
-        else
+        else if (podeCadastrarPares)
           Column(
             children: [
               for (var i = 0; i < _linhasGeminadas.length; i++)
