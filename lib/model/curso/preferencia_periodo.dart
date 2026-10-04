@@ -1,19 +1,19 @@
 enum PreferenciaPeriodo {
-  manha,
-  tarde,
-  contraturno;
+  manhaTarde,
+  tardeManha;
 
   static PreferenciaPeriodo fromDb(String? value) => switch (value) {
-        'tarde' => PreferenciaPeriodo.tarde,
-        'contraturno' => PreferenciaPeriodo.contraturno,
-        _ => PreferenciaPeriodo.manha,
-      };
+    'tarde' || 'tarde_manha' => PreferenciaPeriodo.tardeManha,
+    _ => PreferenciaPeriodo.manhaTarde,
+  };
 
-  String toDb() => name;
+  String toDb() => switch (this) {
+    PreferenciaPeriodo.manhaTarde => 'manha_tarde',
+    PreferenciaPeriodo.tardeManha => 'tarde_manha',
+  };
 
   String get rotulo => switch (this) {
-        PreferenciaPeriodo.manha => 'Manhã',
-        PreferenciaPeriodo.tarde => 'Tarde',
-        PreferenciaPeriodo.contraturno => 'Contraturno',
-      };
+    PreferenciaPeriodo.manhaTarde => 'Manhã, depois tarde',
+    PreferenciaPeriodo.tardeManha => 'Tarde, depois manhã',
+  };
 }

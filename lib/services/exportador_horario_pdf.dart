@@ -127,25 +127,6 @@ class ExportadorHorarioPdf {
           ],
         ),
         for (var i = GradeHoraria.inicioTarde;
-            i < GradeHoraria.inicioContraturno;
-            i++)
-          _linhaPeriodo(
-            rotulo: GradeHoraria.periodos[i],
-            indicePeriodo: i,
-            porCelula: porCelula,
-            mapaMaterias: mapaMaterias,
-            mapaProfessores: mapaProfessores,
-            mapaSalas: mapaSalas,
-          ),
-        pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-          children: [
-            _celulaTexto('Contraturno', negrito: true, centralizado: true),
-            for (var d = 0; d < GradeHoraria.dias.length; d++)
-              _celulaTexto('', centralizado: true),
-          ],
-        ),
-        for (var i = GradeHoraria.inicioContraturno;
             i < GradeHoraria.periodos.length;
             i++)
           _linhaPeriodo(

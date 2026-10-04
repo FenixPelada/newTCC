@@ -137,11 +137,11 @@ class ValidadorHorario {
   }
 
   bool _periodoCompativel(PreferenciaPeriodo preferencia, int indicePeriodo) {
-    final faixa = GradeHoraria.faixaDoPeriodo(indicePeriodo);
+    final dentroDaGrade =
+        indicePeriodo >= 0 && indicePeriodo < GradeHoraria.periodos.length;
     return switch (preferencia) {
-      PreferenciaPeriodo.manha => faixa == 0,
-      PreferenciaPeriodo.tarde => faixa == 1,
-      PreferenciaPeriodo.contraturno => true,
+      PreferenciaPeriodo.manhaTarde || PreferenciaPeriodo.tardeManha =>
+        dentroDaGrade,
     };
   }
 

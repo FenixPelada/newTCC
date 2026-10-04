@@ -12,7 +12,7 @@ class ResultadoFormularioCurso {
     required this.cargas,
     required this.aulasGeminadas,
     this.idSala,
-    this.preferenciaPeriodo = PreferenciaPeriodo.manha,
+    this.preferenciaPeriodo = PreferenciaPeriodo.manhaTarde,
   });
 
   final String nome;
@@ -54,7 +54,7 @@ Future<ResultadoFormularioCurso?> mostrarDialogoFormularioCurso(
   required List<Sala> salas,
   String? nomeInicial,
   String? idSalaInicial,
-  PreferenciaPeriodo preferenciaPeriodoInicial = PreferenciaPeriodo.manha,
+  PreferenciaPeriodo preferenciaPeriodoInicial = PreferenciaPeriodo.manhaTarde,
   List<CargaCursoMateria> cargasIniciais = const [],
   List<AulaGeminadaCurso> aulasGeminadasIniciais = const [],
   String idCurso = '0',
@@ -344,18 +344,8 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'As duas matérias acontecem juntas nesta quantidade de períodos. '
-          'O restante da carga fica em horários separados.',
-          style: TextStyle(fontSize: 12),
-        ),
-        const SizedBox(height: 8),
-        if (!podeCadastrarPares)
-          const Text('Defina pelo menos duas matérias na carga do curso.')
-        else if (_linhasGeminadas.isEmpty)
-          const Text('Nenhum par geminado cadastrado.')
-        else if (podeCadastrarPares)
+        if (podeCadastrarPares && _linhasGeminadas.isNotEmpty) ...[
+          const SizedBox(height: 8),
           Column(
             children: [
               for (var i = 0; i < _linhasGeminadas.length; i++)
@@ -449,6 +439,7 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
                 ),
             ],
           ),
+        ],
       ],
     );
   }
@@ -530,17 +521,8 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Bloco: aulas consecutivas no mesmo dia, até a carga da matéria.',
-                style: TextStyle(fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              if (widget.materias.isEmpty)
-                const Text(
-                  'Cadastre matérias antes de definir a carga horária.',
-                )
-              else
+              if (widget.materias.isNotEmpty) ...[
+                const SizedBox(height: 8),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 280),
                   child: SingleChildScrollView(
@@ -638,6 +620,7 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
                     ),
                   ),
                 ),
+              ],
               const SizedBox(height: 12),
               _secaoAulasGeminadas(),
             ],

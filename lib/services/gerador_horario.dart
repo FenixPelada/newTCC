@@ -240,11 +240,9 @@ class GeradorHorario {
   List<List<int>> _fasesPeriodo(PreferenciaPeriodo preferencia) {
     const manha = [0, 1, 2, 3, 4, 5];
     const tarde = [6, 7, 8, 9, 10, 11];
-    const contraturno = [12, 13];
     return switch (preferencia) {
-      PreferenciaPeriodo.manha => [manha],
-      PreferenciaPeriodo.tarde => [tarde],
-      PreferenciaPeriodo.contraturno => [manha, tarde, contraturno],
+      PreferenciaPeriodo.manhaTarde => [manha, tarde],
+      PreferenciaPeriodo.tardeManha => [tarde, manha],
     };
   }
 

@@ -18,7 +18,7 @@ class Aula {
   /// 0 = Seg … 4 = Sex (mesmo índice do [CelulaGrade])
   final int indiceDia;
 
-  /// 0–5 manhã, 6–11 tarde, 12–13 contraturno (DB: periodo 1–14)
+  /// 0–5 manhã, 6–11 tarde (DB: periodo 1–12)
   final int indicePeriodo;
 
   final String idMateria;

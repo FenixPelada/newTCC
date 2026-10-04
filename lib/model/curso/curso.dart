@@ -5,7 +5,7 @@ class Curso {
     required this.id,
     required this.nome,
     this.idSala,
-    this.preferenciaPeriodo = PreferenciaPeriodo.manha,
+    this.preferenciaPeriodo = PreferenciaPeriodo.manhaTarde,
     this.turnoCompartilhado = false,
   });
 
@@ -15,7 +15,7 @@ class Curso {
   /// Sala padrão do curso (opcional).
   final String? idSala;
 
-  /// Manhã, tarde ou contraturno (manhã → tarde → 2 períodos de contraturno).
+  /// Começa pela manhã e completa na tarde, ou o inverso.
   final PreferenciaPeriodo preferenciaPeriodo;
 
   /// Se true, a turma pode ter 2 aulas no mesmo horário (2 grupos).

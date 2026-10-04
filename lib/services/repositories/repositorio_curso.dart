@@ -140,7 +140,7 @@ class RepositorioCurso {
   Future<String> adicionar(
     String nome, {
     String? idSala,
-    PreferenciaPeriodo preferenciaPeriodo = PreferenciaPeriodo.manha,
+    PreferenciaPeriodo preferenciaPeriodo = PreferenciaPeriodo.manhaTarde,
     bool turnoCompartilhado = false,
     List<CargaCursoMateria> cargas = const [],
     List<AulaGeminadaCurso> aulasGeminadas = const [],

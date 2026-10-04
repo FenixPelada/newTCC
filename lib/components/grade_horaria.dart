@@ -8,7 +8,7 @@ class CelulaGrade {
   /// 0 = Seg … 4 = Sex
   final int indiceDia;
 
-  /// 0–5 manhã, 6–11 tarde, 12–13 contraturno
+  /// 0–5 manhã, 6–11 tarde
   final int indicePeriodo;
 
   @override
@@ -21,7 +21,7 @@ class CelulaGrade {
   int get hashCode => Object.hash(indiceDia, indicePeriodo);
 }
 
-/// Shared grade: Seg–Sex × 6 manhã + Almoço + 6 tarde + 2 contraturno.
+/// Shared grade: Seg–Sex × 6 manhã + Almoço + 6 tarde.
 ///
 /// - Page 2: [interativo] true — tap toggles red (unavailable).
 /// - Page 3: pass [construirCelula] to show/edit aulas.
@@ -36,7 +36,7 @@ class GradeHoraria extends StatelessWidget {
 
   static const dias = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
 
-  /// 14 períodos: 0–5 manhã, 6–11 tarde, 12–13 contraturno. DB: periodo 1–14.
+  /// 12 períodos: 0–5 manhã, 6–11 tarde. DB: periodo 1–12.
   static const periodos = [
     '1º M',
     '2º M',
@@ -50,23 +50,17 @@ class GradeHoraria extends StatelessWidget {
     '4º T',
     '5º T',
     '6º T',
-    '1º C',
-    '2º C',
   ];
 
   static const quantidadePeriodosManha = 6;
   static const quantidadePeriodosTarde = 6;
-  static const quantidadePeriodosContraturno = 2;
 
   static int get inicioTarde => quantidadePeriodosManha;
-  static int get inicioContraturno =>
-      quantidadePeriodosManha + quantidadePeriodosTarde;
 
-  /// 0 = manhã, 1 = tarde, 2 = contraturno
+  /// 0 = manhã, 1 = tarde
   static int faixaDoPeriodo(int indicePeriodo) {
     if (indicePeriodo < quantidadePeriodosManha) return 0;
-    if (indicePeriodo < inicioContraturno) return 1;
-    return 2;
+    return 1;
   }
 
   static bool periodosNaMesmaFaixa(int a, int b) =>
@@ -112,10 +106,7 @@ class GradeHoraria extends StatelessWidget {
                   for (var p = 0; p < quantidadePeriodosManha; p++)
                     _linhaPeriodo(p),
                   _linhaSeparador('Almoço'),
-                  for (var p = inicioTarde; p < inicioContraturno; p++)
-                    _linhaPeriodo(p),
-                  _linhaSeparador('Contraturno'),
-                  for (var p = inicioContraturno; p < periodos.length; p++)
+                  for (var p = inicioTarde; p < periodos.length; p++)
                     _linhaPeriodo(p),
                 ],
               ),
