@@ -55,7 +55,7 @@ class ExportadorHorarioPdf {
               if (salaPadrao != null) ...[
                 pw.SizedBox(height: 4),
                 pw.Text(
-                  'Sala padrão: ${salaPadrao.numero}',
+                  'Sala padrão: ${salaPadrao.rotulo}',
                   style: const pw.TextStyle(fontSize: 11),
                 ),
               ],

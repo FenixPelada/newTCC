@@ -11,16 +11,22 @@ class ColunaSala extends ConsumerWidget {
   const ColunaSala({super.key});
 
   Future<void> _criar(BuildContext context, WidgetRef ref) async {
-    final numero = await mostrarDialogoNumero(
+    final dados = await mostrarDialogoNumero(
       context,
       titulo: 'Nova sala',
       rotulo: 'Número da sala',
     );
-    if (numero == null) return;
+    if (dados == null) return;
 
     try {
-      await ref.read(provedorRepositorioSala).adicionar(numero);
+      await ref.read(provedorRepositorioSala).adicionar(dados.numero, dados.tipo);
       ref.invalidate(provedorSalas);
+    } on SalaDuplicada {
+      if (!context.mounted) return;
+      _mostrarErro(
+        context,
+        'Esse número já está em uso para ${dados.tipo.rotulo}.',
+      );
     } catch (e) {
       if (!context.mounted) return;
       _mostrarErro(context, e);
@@ -32,19 +38,26 @@ class ColunaSala extends ConsumerWidget {
     WidgetRef ref,
     Sala room,
   ) async {
-    final numero = await mostrarDialogoNumero(
+    final dados = await mostrarDialogoNumero(
       context,
       titulo: 'Editar sala',
       rotulo: 'Número da sala',
       numeroInicial: room.numero,
+      tipoInicial: room.tipo,
     );
-    if (numero == null) return;
+    if (dados == null) return;
 
     try {
       await ref.read(provedorRepositorioSala).atualizar(
-            Sala(id: room.id, numero: numero),
+            Sala(id: room.id, numero: dados.numero, tipo: dados.tipo),
           );
       ref.invalidate(provedorSalas);
+    } on SalaDuplicada {
+      if (!context.mounted) return;
+      _mostrarErro(
+        context,
+        'Esse número já está em uso para ${dados.tipo.rotulo}.',
+      );
     } catch (e) {
       if (!context.mounted) return;
       _mostrarErro(context, e);
@@ -60,7 +73,7 @@ class ColunaSala extends ConsumerWidget {
       context,
       titulo: 'Excluir sala',
       mensagem:
-          'Excluir a Sala ${room.numero}? Cursos e aulas que usavam esta '
+          'Excluir ${room.rotulo}? Cursos e aulas que usavam esta '
           'sala ficam sem sala.',
     );
     if (!confirmed) return;
@@ -107,7 +120,7 @@ class ColunaSala extends ConsumerWidget {
             children: salas
                 .map(
                   (room) => CartaoItem(
-                    titulo: 'Sala ${room.numero}',
+                    titulo: room.rotulo,
                     aoEditar: () => _editar(context, ref, room),
                     aoExcluir: () => _excluir(context, ref, room),
                   ),

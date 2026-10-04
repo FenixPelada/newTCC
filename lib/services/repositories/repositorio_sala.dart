@@ -52,26 +52,40 @@ class RepositorioSala {
   }
 
   Future<List<Sala>> buscarTodos() async {
-    final data = await _client.from(_table).select().order('numero');
+    final data = await _client
+        .from(_table)
+        .select()
+        .order('tipo')
+        .order('numero');
     return (data as List)
         .map((row) => Sala.fromJson(row as Map<String, dynamic>))
         .toList();
   }
 
-  Future<String> adicionar(int numero) async {
-    final row = await _client
-        .from(_table)
-        .insert({'numero': numero})
-        .select('id')
-        .single();
-    return row['id'].toString();
+  Future<String> adicionar(int numero, TipoSala tipo) async {
+    try {
+      final row = await _client
+          .from(_table)
+          .insert({'numero': numero, 'tipo': tipo.toDb()})
+          .select('id')
+          .single();
+      return row['id'].toString();
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') throw const SalaDuplicada();
+      rethrow;
+    }
   }
 
   Future<void> atualizar(Sala room) async {
-    await _client
-        .from(_table)
-        .update({'numero': room.numero})
-        .eq('id', int.parse(room.id));
+    try {
+      await _client
+          .from(_table)
+          .update({'numero': room.numero, 'tipo': room.tipo.toDb()})
+          .eq('id', int.parse(room.id));
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') throw const SalaDuplicada();
+      rethrow;
+    }
   }
 
   Future<void> excluir(String id) async {

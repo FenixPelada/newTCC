@@ -468,7 +468,7 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
                   ...widget.salas.map(
                     (room) => DropdownMenuItem<String?>(
                       value: room.id,
-                      child: Text('Sala ${room.numero}'),
+                      child: Text(room.rotulo),
                     ),
                   ),
                 ],

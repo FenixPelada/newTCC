@@ -124,7 +124,7 @@ class ValidadorHorario {
             other.idSala == idSala &&
             other.idCurso != aula.idCurso) {
           final room = roomById[idSala];
-          final roomLabel = room == null ? 'Sala' : 'Sala ${room.numero}';
+          final roomLabel = room?.rotulo ?? 'Sala';
           final otherCourse = courseById[other.idCurso]?.nome ?? 'outra turma';
           problemas.add(
             '$roomLabel ocupada por $otherCourse (${_rotuloCelula(celula)})',

@@ -106,7 +106,7 @@ class CelulaHorario extends StatelessWidget {
           ),
           if (sala != null)
             Text(
-              'Sala ${sala.numero}',
+              sala.rotulo,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,

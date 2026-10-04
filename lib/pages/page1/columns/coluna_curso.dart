@@ -186,7 +186,7 @@ class ColunaCurso extends ConsumerWidget {
                   'Sem matérias'
                 else
                   '$materiaCount matérias · $totalAulas aulas',
-                if (room != null) 'Sala ${room.numero}',
+                if (room != null) room.rotulo,
               ];
 
               return CartaoItem(
