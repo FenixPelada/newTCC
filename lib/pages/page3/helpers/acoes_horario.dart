@@ -46,6 +46,7 @@ class AcoesHorario {
     required List<Professor> professores,
     required List<ProfessorMateria> ligacoes,
     required List<IndisponibilidadeProfessor> indisponibilidades,
+    required List<AulaGeminadaCurso> aulasGeminadas,
     required List<Materia> materias,
   }) async {
     final confirmado = await mostrarDialogoConfirmarExclusao(
@@ -68,6 +69,7 @@ class AcoesHorario {
       professores: professores,
       ligacoes: ligacoes,
       indisponibilidades: indisponibilidades,
+      aulasGeminadas: aulasGeminadas,
       nomesMaterias: {for (final m in materias) m.id: m.nome},
       nomesCursos: {for (final c in cursos) c.id: c.nome},
     );

@@ -6,8 +6,6 @@ import 'package:flutter_test_project/model/curso/carga_curso_materia.dart';
 import 'package:flutter_test_project/model/sala/sala.dart';
 import 'package:flutter_test_project/model/materia/materia.dart';
 
-const int _maxAulasGeminadasPorCurso = 10;
-
 class ResultadoFormularioCurso {
   const ResultadoFormularioCurso({
     required this.nome,
@@ -36,10 +34,17 @@ class _LinhaCarga {
 }
 
 class _LinhaAulaGeminada {
-  _LinhaAulaGeminada({this.idMateriaA, this.idMateriaB});
+  _LinhaAulaGeminada({
+    this.idMateriaA,
+    this.idMateriaB,
+    int quantidadePeriodos = 1,
+  }) : controladorPeriodos = TextEditingController(text: '$quantidadePeriodos');
 
   String? idMateriaA;
   String? idMateriaB;
+  final TextEditingController controladorPeriodos;
+
+  void dispose() => controladorPeriodos.dispose();
 }
 
 Future<ResultadoFormularioCurso?> mostrarDialogoFormularioCurso(
@@ -129,6 +134,7 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
           (par) => _LinhaAulaGeminada(
             idMateriaA: par.idMateriaA,
             idMateriaB: par.idMateriaB,
+            quantidadePeriodos: par.quantidadePeriodos,
           ),
         )
         .toList();
@@ -140,13 +146,15 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
     for (final row in _linhas) {
       row.dispose();
     }
+    for (final row in _linhasGeminadas) {
+      row.dispose();
+    }
     super.dispose();
   }
 
   void _adicionarLinha() => setState(() => _linhas.add(_LinhaCarga()));
 
   void _adicionarLinhaGeminada() {
-    if (_linhasGeminadas.length >= _maxAulasGeminadasPorCurso) return;
     setState(() => _linhasGeminadas.add(_LinhaAulaGeminada()));
   }
 
@@ -159,7 +167,10 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
   }
 
   void _removerLinhaGeminada(int index) {
-    setState(() => _linhasGeminadas.removeAt(index));
+    setState(() {
+      _linhasGeminadas[index].dispose();
+      _linhasGeminadas.removeAt(index);
+    });
   }
 
   int _quantidadeAulas(_LinhaCarga row) {
@@ -231,15 +242,12 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
     }
 
     final idsCargas = cargas.map((carga) => carga.idMateria).toSet();
+    final cargaPorMateria = {
+      for (final carga in cargas) carga.idMateria: carga.quantidadeAulas,
+    };
+    final periodosPorMateria = <String, int>{};
     final aulasGeminadas = <AulaGeminadaCurso>[];
     final paresVistos = <String>{};
-    if (_linhasGeminadas.length > _maxAulasGeminadasPorCurso) {
-      setState(
-        () => _erro =
-            'Cadastre no máximo $_maxAulasGeminadasPorCurso aulas geminadas',
-      );
-      return;
-    }
     for (final row in _linhasGeminadas) {
       final idMateriaA = row.idMateriaA;
       final idMateriaB = row.idMateriaB;
@@ -261,10 +269,39 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
         return;
       }
 
+      final periodos = int.tryParse(row.controladorPeriodos.text.trim());
+      if (periodos == null || periodos < 1) {
+        setState(
+          () => _erro = 'Períodos da aula geminada deve ser um número ≥ 1',
+        );
+        return;
+      }
+      final cargaA = cargaPorMateria[idMateriaA] ?? 0;
+      final cargaB = cargaPorMateria[idMateriaB] ?? 0;
+      if (periodos > cargaA || periodos > cargaB) {
+        setState(
+          () => _erro =
+              'Períodos geminados não podem passar da carga das matérias',
+        );
+        return;
+      }
+      final usadoA = (periodosPorMateria[idMateriaA] ?? 0) + periodos;
+      final usadoB = (periodosPorMateria[idMateriaB] ?? 0) + periodos;
+      if (usadoA > cargaA || usadoB > cargaB) {
+        setState(
+          () => _erro =
+              'A soma dos períodos geminados passa da carga de uma matéria',
+        );
+        return;
+      }
+      periodosPorMateria[idMateriaA] = usadoA;
+      periodosPorMateria[idMateriaB] = usadoB;
+
       final par = AulaGeminadaCurso(
         idCurso: widget.idCurso,
         idMateriaA: idMateriaA,
         idMateriaB: idMateriaB,
+        quantidadePeriodos: periodos,
       );
       if (!paresVistos.add(par.chave)) {
         setState(() => _erro = 'Par de aula geminada repetido');
@@ -288,9 +325,6 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
   Widget _secaoAulasGeminadas() {
     final materiasComCarga = _materiasComCarga();
     final podeCadastrarPares = materiasComCarga.length >= 2;
-    final atingiuLimite =
-        _linhasGeminadas.length >= _maxAulasGeminadasPorCurso;
-    final podeAdicionar = podeCadastrarPares && !atingiuLimite;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -303,13 +337,8 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
-            Text(
-              '${_linhasGeminadas.length}/$_maxAulasGeminadasPorCurso',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(width: 8),
             TextButton.icon(
-              onPressed: podeAdicionar ? _adicionarLinhaGeminada : null,
+              onPressed: podeCadastrarPares ? _adicionarLinhaGeminada : null,
               icon: const Icon(Icons.add),
               label: const Text('Aula'),
             ),
@@ -317,18 +346,14 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Permite até 10 pares de matérias diferentes ao mesmo tempo apenas nesta turma.',
+          'As duas matérias acontecem juntas nesta quantidade de períodos. '
+          'O restante da carga fica em horários separados.',
           style: TextStyle(fontSize: 12),
         ),
         const SizedBox(height: 8),
         if (!podeCadastrarPares)
           const Text('Defina pelo menos duas matérias na carga do curso.')
-        else if (atingiuLimite)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: Text('Limite de 10 aulas geminadas atingido.'),
-          ),
-        if (podeCadastrarPares && _linhasGeminadas.isEmpty)
+        else if (_linhasGeminadas.isEmpty)
           const Text('Nenhum par geminado cadastrado.')
         else if (podeCadastrarPares)
           Column(
@@ -397,6 +422,21 @@ class _CourseFormDialogState extends State<_CourseFormDialog> {
                               () => _linhasGeminadas[i].idMateriaB = value,
                             );
                           },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 88,
+                        child: TextField(
+                          controller: _linhasGeminadas[i].controladorPeriodos,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'Períodos',
+                            isDense: true,
+                          ),
                         ),
                       ),
                       IconButton(

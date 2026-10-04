@@ -1,5 +1,6 @@
 import 'package:flutter_test_project/components/grade_horaria.dart';
 import 'package:flutter_test_project/model/aula/aula.dart';
+import 'package:flutter_test_project/model/curso/aula_geminada_curso.dart';
 import 'package:flutter_test_project/model/curso/curso.dart';
 import 'package:flutter_test_project/model/curso/preferencia_periodo.dart';
 import 'package:flutter_test_project/model/curso/carga_curso_materia.dart';
@@ -45,6 +46,7 @@ class GeradorHorario {
     required List<Professor> professores,
     required List<ProfessorMateria> ligacoes,
     required List<IndisponibilidadeProfessor> indisponibilidades,
+    List<AulaGeminadaCurso> aulasGeminadas = const [],
     Map<String, String> nomesMaterias = const {},
     Map<String, String> nomesCursos = const {},
   }) {
@@ -66,6 +68,7 @@ class GeradorHorario {
         professores: professores,
         ligacoes: ligacoes,
         indisponibilidades: indisponibilidades,
+        aulasGeminadas: aulasGeminadas,
         aulasExistentes: trabalhando,
         nomesMaterias: nomesMaterias,
       );
@@ -85,6 +88,7 @@ class GeradorHorario {
     required List<ProfessorMateria> ligacoes,
     required List<IndisponibilidadeProfessor> indisponibilidades,
     required List<Aula> aulasExistentes,
+    List<AulaGeminadaCurso> aulasGeminadas = const [],
     Map<String, String> nomesMaterias = const {},
   }) {
     final idCurso = curso.id;
@@ -119,6 +123,19 @@ class GeradorHorario {
 
     String rotulo(String idMateria) =>
         nomesMaterias[idMateria] ?? 'matéria $idMateria';
+
+    _alocarGeminadas(
+      curso: curso,
+      cargasCurso: cargasCurso,
+      aulasGeminadas: aulasGeminadas,
+      professores: professores,
+      ligacoes: ligacoes,
+      indisponibilidades: indisponibilidades,
+      trabalhando: trabalhando,
+      novasAulas: novasAulas,
+      falhas: falhas,
+      rotulo: rotulo,
+    );
 
     for (final carga in cargasCurso) {
       final jaAlocado = trabalhando
@@ -238,6 +255,244 @@ class GeradorHorario {
     for (var i = 0; i <= faixaPeriodos.length - tamanhoBloco; i++) {
       yield faixaPeriodos[i];
     }
+  }
+
+  void _alocarGeminadas({
+    required Curso curso,
+    required List<CargaCursoMateria> cargasCurso,
+    required List<AulaGeminadaCurso> aulasGeminadas,
+    required List<Professor> professores,
+    required List<ProfessorMateria> ligacoes,
+    required List<IndisponibilidadeProfessor> indisponibilidades,
+    required List<Aula> trabalhando,
+    required List<Aula> novasAulas,
+    required List<String> falhas,
+    required String Function(String idMateria) rotulo,
+  }) {
+    final cargaPorMateria = {
+      for (final carga in cargasCurso) carga.idMateria: carga.quantidadeAulas,
+    };
+
+    List<Professor> professoresDa(String idMateria) {
+      return professores
+          .where(
+            (p) => ligacoes.any(
+              (l) => l.idProfessor == p.id && l.idMateria == idMateria,
+            ),
+          )
+          .toList();
+    }
+
+    int jaAlocado(String idMateria) {
+      return trabalhando
+          .where(
+            (a) => a.idCurso == curso.id && a.idMateria == idMateria,
+          )
+          .length;
+    }
+
+    for (final par in aulasGeminadas.where((p) => p.idCurso == curso.id)) {
+      final nomeA = rotulo(par.idMateriaA);
+      final nomeB = rotulo(par.idMateriaB);
+      final professoresA = professoresDa(par.idMateriaA);
+      final professoresB = professoresDa(par.idMateriaB);
+      if (professoresA.isEmpty || professoresB.isEmpty) {
+        falhas.add(
+          'Aula geminada de $nomeA e $nomeB: falta professor em uma das matérias.',
+        );
+        continue;
+      }
+      final temProfessoresDiferentes = professoresA.any(
+        (a) => professoresB.any((b) => b.id != a.id),
+      );
+      if (!temProfessoresDiferentes) {
+        falhas.add(
+          'Aula geminada de $nomeA e $nomeB precisa de dois professores diferentes.',
+        );
+        continue;
+      }
+
+      final restanteA =
+          (cargaPorMateria[par.idMateriaA] ?? 0) - jaAlocado(par.idMateriaA);
+      final restanteB =
+          (cargaPorMateria[par.idMateriaB] ?? 0) - jaAlocado(par.idMateriaB);
+      final limiteCarga = restanteA < restanteB ? restanteA : restanteB;
+      var restante = par.quantidadePeriodos < limiteCarga
+          ? par.quantidadePeriodos
+          : limiteCarga;
+      if (restante < 0) restante = 0;
+      final excedente = par.quantidadePeriodos - restante;
+      if (excedente > 0) {
+        falhas.add(
+          'Aula geminada de $nomeA e $nomeB pede ${par.quantidadePeriodos} '
+          'período(s), mas a carga só comporta $restante.',
+        );
+      }
+
+      while (restante > 0) {
+        if (_tentarColocarPar(
+          curso: curso,
+          idMateriaA: par.idMateriaA,
+          idMateriaB: par.idMateriaB,
+          professoresA: professoresA,
+          professoresB: professoresB,
+          indisponibilidades: indisponibilidades,
+          trabalhando: trabalhando,
+          novasAulas: novasAulas,
+        )) {
+          restante--;
+          continue;
+        }
+        falhas.add(
+          'Não coube aula geminada de $nomeA e $nomeB '
+          '($restante período(s) faltando).',
+        );
+        break;
+      }
+    }
+  }
+
+  bool _tentarColocarPar({
+    required Curso curso,
+    required String idMateriaA,
+    required String idMateriaB,
+    required List<Professor> professoresA,
+    required List<Professor> professoresB,
+    required List<IndisponibilidadeProfessor> indisponibilidades,
+    required List<Aula> trabalhando,
+    required List<Aula> novasAulas,
+  }) {
+    for (final faixaPeriodos in _fasesPeriodo(curso.preferenciaPeriodo)) {
+      for (var dia = 0; dia < GradeHoraria.dias.length; dia++) {
+        for (final periodo in faixaPeriodos) {
+          for (final professorA in professoresA) {
+            for (final professorB in professoresB) {
+              if (professorA.id == professorB.id) continue;
+              if (!_parCabe(
+                idCurso: curso.id,
+                idMateriaA: idMateriaA,
+                idMateriaB: idMateriaB,
+                idProfessorA: professorA.id,
+                idProfessorB: professorB.id,
+                dia: dia,
+                periodo: periodo,
+                idSala: curso.idSala,
+                indisponibilidades: indisponibilidades,
+                trabalhando: trabalhando,
+              )) {
+                continue;
+              }
+              _registrarAula(
+                idCurso: curso.id,
+                idMateria: idMateriaA,
+                idProfessor: professorA.id,
+                dia: dia,
+                periodo: periodo,
+                idSala: curso.idSala,
+                grupo: 1,
+                trabalhando: trabalhando,
+                novasAulas: novasAulas,
+              );
+              _registrarAula(
+                idCurso: curso.id,
+                idMateria: idMateriaB,
+                idProfessor: professorB.id,
+                dia: dia,
+                periodo: periodo,
+                idSala: curso.idSala,
+                grupo: 2,
+                trabalhando: trabalhando,
+                novasAulas: novasAulas,
+              );
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  bool _parCabe({
+    required String idCurso,
+    required String idMateriaA,
+    required String idMateriaB,
+    required String idProfessorA,
+    required String idProfessorB,
+    required int dia,
+    required int periodo,
+    required String? idSala,
+    required List<IndisponibilidadeProfessor> indisponibilidades,
+    required List<Aula> trabalhando,
+  }) {
+    if (trabalhando.any(
+      (a) =>
+          a.idCurso == idCurso &&
+          (a.idMateria == idMateriaA || a.idMateria == idMateriaB) &&
+          a.indiceDia == dia,
+    )) {
+      return false;
+    }
+    if (trabalhando.any(
+      (a) =>
+          a.idCurso == idCurso &&
+          a.indiceDia == dia &&
+          a.indicePeriodo == periodo,
+    )) {
+      return false;
+    }
+
+    final celula = CelulaGrade(indiceDia: dia, indicePeriodo: periodo);
+    for (final idProfessor in [idProfessorA, idProfessorB]) {
+      if (trabalhando.any(
+        (a) =>
+            a.idProfessor == idProfessor &&
+            a.indiceDia == dia &&
+            a.indicePeriodo == periodo,
+      )) {
+        return false;
+      }
+      if (_estaIndisponivel(indisponibilidades, idProfessor, celula)) {
+        return false;
+      }
+    }
+
+    if (idSala != null &&
+        trabalhando.any(
+          (a) =>
+              a.idCurso != idCurso &&
+              a.idSala == idSala &&
+              a.indiceDia == dia &&
+              a.indicePeriodo == periodo,
+        )) {
+      return false;
+    }
+    return true;
+  }
+
+  void _registrarAula({
+    required String idCurso,
+    required String idMateria,
+    required String idProfessor,
+    required int dia,
+    required int periodo,
+    required String? idSala,
+    required int grupo,
+    required List<Aula> trabalhando,
+    required List<Aula> novasAulas,
+  }) {
+    final aula = Aula(
+      id: 'pending',
+      idCurso: idCurso,
+      indiceDia: dia,
+      indicePeriodo: periodo,
+      idMateria: idMateria,
+      idProfessor: idProfessor,
+      idSala: idSala,
+      grupo: grupo,
+    );
+    trabalhando.add(aula);
+    novasAulas.add(aula);
   }
 
   bool _tentarColocarBloco({

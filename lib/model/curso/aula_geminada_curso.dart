@@ -3,24 +3,28 @@ class AulaGeminadaCurso {
     required this.idCurso,
     required String idMateriaA,
     required String idMateriaB,
+    this.quantidadePeriodos = 1,
   }) : idMateriaA = _primeiroId(idMateriaA, idMateriaB),
        idMateriaB = _segundoId(idMateriaA, idMateriaB);
 
   final String idCurso;
   final String idMateriaA;
   final String idMateriaB;
+  final int quantidadePeriodos;
 
   factory AulaGeminadaCurso.fromJson(Map<String, dynamic> json) =>
       AulaGeminadaCurso(
         idCurso: json['id_curso'].toString(),
         idMateriaA: json['id_materia_a'].toString(),
         idMateriaB: json['id_materia_b'].toString(),
+        quantidadePeriodos: (json['quantidade_periodos'] as num?)?.toInt() ?? 1,
       );
 
   Map<String, dynamic> toInsertJson({String? idCursoOverride}) => {
     'id_curso': int.parse(idCursoOverride ?? idCurso),
     'id_materia_a': int.parse(idMateriaA),
     'id_materia_b': int.parse(idMateriaB),
+    'quantidade_periodos': quantidadePeriodos < 1 ? 1 : quantidadePeriodos,
   };
 
   bool contemMateria(String idMateria) =>

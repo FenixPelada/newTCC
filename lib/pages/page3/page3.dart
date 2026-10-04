@@ -60,6 +60,7 @@ class _Page3State extends ConsumerState<Page3> {
     required List<Professor> professores,
     required List<ProfessorMateria> ligacoes,
     required List<IndisponibilidadeProfessor> indisponibilidades,
+    required List<AulaGeminadaCurso> aulasGeminadas,
     required List<Materia> materias,
   }) {
     return _comOcupado(
@@ -70,6 +71,7 @@ class _Page3State extends ConsumerState<Page3> {
         professores: professores,
         ligacoes: ligacoes,
         indisponibilidades: indisponibilidades,
+        aulasGeminadas: aulasGeminadas,
         materias: materias,
       ),
     );
@@ -200,6 +202,7 @@ class _Page3State extends ConsumerState<Page3> {
                         professores: professores,
                         ligacoes: ligacoes,
                         indisponibilidades: indisponibilidades,
+                        aulasGeminadas: aulasGeminadas,
                         materias: materias,
                       ),
                 aoPdf: cursos.isEmpty
